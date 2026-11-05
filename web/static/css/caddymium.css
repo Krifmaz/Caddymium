@@ -83,3 +83,8 @@ pre.code-block { margin: 0; padding: 14px 16px; background: var(--bg-2); border:
   .sum-actions { margin-left: 0; width: 100%; }
   .sum-actions .btn { flex: 1; }
 }
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; }
+.ev-grid label { gap: 8px; }
+pre.peek { max-height: 140px; overflow: hidden; margin: 0; }
+button.card.item { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 8px; width: 100%; }
+button.card.item:hover { border-color: var(--accent); }

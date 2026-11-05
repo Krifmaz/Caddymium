@@ -11,6 +11,7 @@
 //! yet links to its classic version.
 
 mod app;
+mod form;
 mod icons;
 mod pages;
 mod ui;

@@ -337,3 +337,60 @@ mod tests {
         assert_eq!(r[4], DiffRow::Add(5, "more".into()));
     }
 }
+
+// ---------------------------------------------------------------- dialogs
+
+/// Closes the dialog it was handed to (set once the dialog is open).
+#[derive(Clone, Default)]
+pub struct Closer(std::rc::Rc<std::cell::RefCell<Option<kit_leptos::modal::Modal>>>);
+
+impl Closer {
+    /// Closes the dialog.
+    pub fn close(&self) {
+        if let Some(m) = self.0.borrow_mut().take() {
+            m.close();
+        }
+    }
+}
+
+/// Opens a dialog (the kit's modal) with `body` and `footer`, both handed a [`Closer`].
+pub fn dialog<B, F>(title: &str, wide: bool, body: impl FnOnce(Closer) -> B + 'static, footer: impl FnOnce(Closer) -> F + 'static) -> Closer
+where
+    B: IntoView + 'static,
+    F: IntoView + 'static,
+{
+    let c = Closer::default();
+    let (c1, c2) = (c.clone(), c.clone());
+    let m = kit_leptos::modal::open(
+        kit_leptos::modal::ModalOpts::with_view(title, move || body(c1)).footer_view(move || footer(c2)).wide(wide),
+    );
+    *c.0.borrow_mut() = Some(m);
+    c
+}
+
+/// A signal holding a call's answer: None while it loads.
+pub type Loaded = RwSignal<Option<Result<Value, String>>>;
+
+/// Loads `path` into a new [`Loaded`] signal; [`reload`] loads it again.
+pub fn load(path: &str) -> Loaded {
+    let sig: Loaded = RwSignal::new(None);
+    reload(sig, path);
+    sig
+}
+
+/// Loads `path` into `sig` again (the old answer stays until the new one is in).
+pub fn reload(sig: Loaded, path: &str) {
+    let path = path.to_string();
+    kit_leptos::rt::spawn(async move {
+        sig.set(Some(kit_leptos::api::get(&path).await.map_err(|e| e.message)));
+    });
+}
+
+/// Draws a [`Loaded`] signal: the spinner, the error, or `f` of the answer.
+pub fn show<V: IntoView + 'static>(sig: Loaded, f: impl Fn(Value) -> V + 'static) -> impl Fn() -> AnyView {
+    move || match sig.get() {
+        None => view! { <Loading/> }.into_any(),
+        Some(Err(e)) => view! { <ErrorBox message=e/> }.into_any(),
+        Some(Ok(v)) => f(v).into_any(),
+    }
+}
