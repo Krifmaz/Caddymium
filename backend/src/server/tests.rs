@@ -68,6 +68,7 @@ async fn start() -> TestServer {
         secure_cookie: false,
         dev_no_auth: false,
         imports: ImportPaths::default(),
+        kit: crate::kit::Kit::memory(dir.path()),
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -870,4 +871,59 @@ async fn errors_say_what_to_do() {
     let nf = ApiError::from(anyhow::Error::new(crate::store::NotFound));
     let m = body(nf).await;
     assert!(m.contains("Reload the page"), "{m}");
+}
+
+#[tokio::test]
+async fn kit_routes_use_the_panel_sign_in() {
+    let ts = start().await;
+    let mut c = TestClient::new(&ts.base);
+    let (code, h) = c.call("GET", "/api/health", None).await;
+    assert_eq!(code, 200, "{h}");
+    assert_eq!(h["ok"], true);
+    assert_eq!(c.call("GET", "/api/changelog", None).await.0, 401);
+    assert_eq!(c.call("GET", "/api/diagnostics", None).await.0, 401);
+    // the panel's own routes still answer under /api
+    assert_eq!(c.call("GET", "/api/nope", None).await.0, 404);
+
+    c.call(
+        "POST",
+        "/api/setup",
+        Some(json!({"username": "admin", "password": "long enough password"})),
+    )
+    .await;
+    let (code, cl) = c.call("GET", "/api/changelog", None).await;
+    assert_eq!(code, 200, "{cl}");
+    let (code, n) = c.call("GET", "/api/notices", None).await;
+    assert_eq!(code, 200, "{n}");
+    let (code, d) = c.call("GET", "/api/diagnostics", None).await;
+    assert_eq!(code, 200, "{d}");
+    let names: Vec<&str> = d["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|c| c["name"].as_str())
+        .collect();
+    assert!(
+        names.contains(&"Caddy admin API") && names.contains(&"Data folder"),
+        "{d}"
+    );
+
+    // a write without the CSRF token is refused, like every panel route
+    let mut no_csrf = TestClient::new(&ts.base);
+    no_csrf.http = c.http.clone();
+    let (code, e) = no_csrf
+        .call("POST", "/api/crash-reports", Some(json!({"text": "boom"})))
+        .await;
+    assert_eq!(code, 403, "{e}");
+    let (code, r) = c
+        .call(
+            "POST",
+            "/api/crash-reports",
+            Some(json!({"kind": "web", "summary": "boom", "text": "panicked at x", "key": "k1"})),
+        )
+        .await;
+    assert_eq!(code, 200, "{r}");
+    let (code, list) = c.call("GET", "/api/crash-reports", None).await;
+    assert_eq!(code, 200, "{list}");
+    assert_eq!(list["crashes"].as_array().unwrap().len(), 1, "{list}");
 }

@@ -32,6 +32,7 @@ RUN mkdir -p src ui/dist && echo 'fn main() {}' > src/main.rs \
     && cargo zigbuild --release --locked --target "$(cat /target)" \
     && rm -rf src target/*/release/deps/caddymium* target/*/release/caddymium*
 COPY backend/ ./
+COPY docs/releases /src/docs/releases
 COPY --from=ui /src/backend/ui/dist ./ui/dist
 RUN CADDYMIUM_VERSION="$VERSION" cargo zigbuild --release --locked --target "$(cat /target)" \
     && cp "target/$(cat /target)/release/caddymium" /caddymium

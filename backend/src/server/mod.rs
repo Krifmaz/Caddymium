@@ -79,6 +79,8 @@ pub struct AppState {
     pub secure_cookie: bool,
     pub dev_no_auth: bool,
     pub imports: ImportPaths,
+    /// The kit's server crates (What's new, notices, bug reports, diagnostics).
+    pub kit: crate::kit::Kit,
     limiter: Mutex<Limiter>,
     scan_lock: tokio::sync::Mutex<()>,
 }
@@ -100,6 +102,7 @@ pub struct AppParts {
     pub secure_cookie: bool,
     pub dev_no_auth: bool,
     pub imports: ImportPaths,
+    pub kit: crate::kit::Kit,
 }
 
 impl AppState {
@@ -127,6 +130,7 @@ impl AppState {
             secure_cookie: p.secure_cookie,
             dev_no_auth: p.dev_no_auth,
             imports: p.imports,
+            kit: p.kit,
             limiter: Mutex::new(Limiter::new(10, Duration::from_secs(15 * 60))),
             scan_lock: tokio::sync::Mutex::new(()),
         })
@@ -583,10 +587,6 @@ pub fn router(st: Arc<AppState>) -> Router {
     };
 
     let public = Router::new()
-        .route(
-            "/health",
-            get(|| async { json(StatusCode::OK, &serde_json::json!({"status": "ok"})) }),
-        )
         .route("/me", get(auth_handlers::me))
         .route("/setup", post(auth_handlers::setup))
         .route("/login", post(auth_handlers::login))
@@ -754,6 +754,7 @@ pub fn router(st: Arc<AppState>) -> Router {
         .route("/sso/logout", get(sso::logout));
 
     Router::new()
+        .merge(crate::kit::router(st.clone()))
         .nest("/api", api)
         .merge(sso_pages)
         .fallback(crate::web::spa)

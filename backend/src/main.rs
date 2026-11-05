@@ -14,6 +14,7 @@ mod diff;
 mod generator;
 mod httpc;
 mod importer;
+mod kit;
 mod model;
 mod notify;
 mod plugins;
@@ -186,6 +187,7 @@ async fn run(cfg: config::Config) -> Result<()> {
             autosave: cfg.caddy_config_dir.join("caddy").join("autosave.json"),
             caddyfile: cfg.import_caddyfile.clone(),
         },
+        kit: kit::Kit::open(&cfg.data_dir, VERSION)?,
     });
     if cfg.dev_no_auth {
         tracing::warn!(
