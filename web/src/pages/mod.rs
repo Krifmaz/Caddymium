@@ -5,6 +5,7 @@ pub mod audit;
 pub mod ddns;
 pub mod deploy;
 pub mod domains;
+pub mod import;
 pub mod kit;
 pub mod login;
 pub mod notifications;
@@ -15,6 +16,7 @@ pub mod site_editor;
 pub mod sites;
 pub mod snippets;
 pub mod users;
+pub mod welcome;
 
 use crate::app::Route;
 use crate::ui::Classic;
@@ -23,12 +25,17 @@ use leptos::prelude::*;
 
 /// The page for `route`.
 pub fn page(route: &Route) -> AnyView {
+    if welcome::due() && route.page() != "import" {
+        return view! { <welcome::Welcome/> }.into_any();
+    }
     match route.page() {
         "account" => view! { <account::Account/> }.into_any(),
         "domains" => view! { <domains::Domains/> }.into_any(),
         "ddns" => view! { <ddns::Ddns/> }.into_any(),
         "plugins" => view! { <plugins::Plugins/> }.into_any(),
         "settings" => view! { <settings::Settings/> }.into_any(),
+        "import" => view! { <import::Import/> }.into_any(),
+        "welcome" => view! { <welcome::Welcome/> }.into_any(),
         "security" => view! { <security::Security/> }.into_any(),
         "sites" => match route.parts().get(1) {
             Some(id) => view! { <site_editor::SiteEditor id=id.to_string()/> }.into_any(),
