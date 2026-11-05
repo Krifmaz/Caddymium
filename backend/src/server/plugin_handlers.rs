@@ -89,6 +89,17 @@ pub async fn rollback(
     Ok(super::json(StatusCode::ACCEPTED, &job))
 }
 
+pub async fn restart(
+    State(st): State<Arc<AppState>>,
+    Extension(p): Extension<Principal>,
+) -> ApiResult {
+    let job = st
+        .plugins
+        .start_restart(p.user.username.clone())
+        .map_err(|e| ApiError::bad(format!("{e:#}")))?;
+    Ok(super::json(StatusCode::ACCEPTED, &job))
+}
+
 pub async fn ddns_status(State(st): State<Arc<AppState>>) -> ApiResult {
     let d = st.store.settings().ddns;
     ok(&ddns::status(&d).await)

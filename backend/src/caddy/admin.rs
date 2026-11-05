@@ -214,6 +214,7 @@ impl Admin {
     }
 
     /// Polls until the admin API responds or the timeout elapses.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub async fn wait_ready(&self, timeout: Duration) -> Result<()> {
         let deadline = tokio::time::Instant::now() + timeout;
         let mut last = String::new();

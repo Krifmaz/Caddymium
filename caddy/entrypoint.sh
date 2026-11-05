@@ -61,6 +61,30 @@ choose() {
 	fi
 }
 
+# The panel kills a Caddy that stopped answering by creating caddy.kill in
+# the shared bin volume; caddy.gen tells it when a new process started.
+GEN_FILE="$BIN_DIR/caddy.gen"
+KILL_FILE="$BIN_DIR/caddy.kill"
+KILLED="/tmp/caddymium-killed"
+gen=0
+rm -f "$KILL_FILE" "$KILLED"
+if [ -d "$BIN_DIR" ]; then
+	(
+		while :; do
+			if [ -e "$KILL_FILE" ]; then
+				rm -f "$KILL_FILE"
+				pid=$(cat /tmp/caddymium-caddy.pid 2>/dev/null)
+				if [ -n "$pid" ]; then
+					echo "caddymium-entrypoint: the panel asked to stop an unresponsive Caddy; killing it" >&2
+					touch "$KILLED"
+					kill -KILL "$pid" 2>/dev/null
+				fi
+			fi
+			sleep 1
+		done
+	) &
+fi
+
 child=""
 term() {
 	if [ -n "$child" ]; then
@@ -82,11 +106,23 @@ while :; do
 	start=$(date +%s)
 	"$BIN" run --config "$CADDYFILE" --adapter caddyfile &
 	child=$!
+	echo "$child" > /tmp/caddymium-caddy.pid
+	gen=$((gen + 1))
+	if [ -d "$BIN_DIR" ]; then
+		echo "$gen" > "$GEN_FILE.tmp" && mv -f "$GEN_FILE.tmp" "$GEN_FILE"
+	fi
 	wait "$child"
 	rc=$?
 	child=""
 	now=$(date +%s)
-	if [ "$BIN" = "$CUSTOM" ] && [ "$rc" -ne 0 ] && [ $((now - start)) -lt 20 ]; then
+	killed=false
+	if [ -e "$KILLED" ]; then
+		killed=true
+		rm -f "$KILLED"
+	fi
+	# A process killed on the panel's request is handled by the panel (it
+	# picks the build to fall back to); only crashes are set aside here.
+	if [ "$killed" = false ] && [ "$BIN" = "$CUSTOM" ] && [ "$rc" -ne 0 ] && [ $((now - start)) -lt 20 ]; then
 		echo "caddymium-entrypoint: custom build exited with $rc within 20s; falling back to the image's Caddy" >&2
 		mv -f "$CUSTOM" "$CUSTOM.broken"
 	fi

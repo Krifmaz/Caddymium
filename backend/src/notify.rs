@@ -19,6 +19,8 @@ pub const EVENT_UPDATE_AVAILABLE: &str = "update_available";
 pub const EVENT_UPDATE_INSTALLED: &str = "update_installed";
 pub const EVENT_UPDATE_FAILED: &str = "update_failed";
 pub const EVENT_BACKUP_FAILED: &str = "backup_failed";
+pub const EVENT_CADDY_DOWN: &str = "caddy_down";
+pub const EVENT_CADDY_RECOVERED: &str = "caddy_recovered";
 pub const EVENT_DISCOVERY: &str = "discovery";
 
 /// Events for the UI.
@@ -33,6 +35,8 @@ pub const ALL_EVENTS: &[&str] = &[
     EVENT_UPDATE_FAILED,
     EVENT_BACKUP_FAILED,
     EVENT_DISCOVERY,
+    EVENT_CADDY_DOWN,
+    EVENT_CADDY_RECOVERED,
 ];
 
 /// Supported channel types and their config fields.
@@ -236,7 +240,8 @@ fn subscribed(events: &[String], e: &str) -> bool {
 fn tag_for(event: &str) -> &'static str {
     match event {
         EVENT_APPLY_FAILED | EVENT_CERT_ERROR | EVENT_UPSTREAM_DOWN | EVENT_BACKUP_FAILED
-        | EVENT_UPDATE_FAILED => "warning",
+        | EVENT_UPDATE_FAILED | EVENT_CADDY_DOWN => "warning",
+        EVENT_CADDY_RECOVERED => "leftwards_arrow_with_hook",
         EVENT_UPSTREAM_UP | EVENT_UPDATE_INSTALLED => "white_check_mark",
         EVENT_UPDATE_AVAILABLE => "package",
         _ => "bell",

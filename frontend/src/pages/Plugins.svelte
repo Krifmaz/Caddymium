@@ -102,6 +102,10 @@
     if (!confirm('Switch back to the previous custom build and restart Caddy?')) return
     run({}, '/plugins/rollback')
   }
+  function restart() {
+    if (!confirm('Restart Caddy? Sites are unavailable for a few seconds. If Caddy does not answer it is stopped forcefully, and if it does not come back the image\'s built-in Caddy takes over.')) return
+    run({}, '/plugins/restart')
+  }
   async function refreshCatalog() {
     busy = true
     try { const c = await api.post('/plugins/catalog/refresh'); if (st) { st.catalog = c.packages; st.catalog_fetched_at = c.fetched_at }; toast('Catalog refreshed') } catch (e) { toastErr(e) }
@@ -147,6 +151,7 @@
         {#if can.admin()}
           <div class="s-actions">
             <button class="btn sm" onclick={upgrade} disabled={busy || running || !st.supported} title="Rebuild with the current plugins against the latest Caddy release"><Download size={14} /> {st.update_available ? 'Update Caddy' : 'Rebuild latest'}</button>
+            <button class="btn sm" onclick={restart} disabled={busy || running}><RefreshCw size={14} /> Restart Caddy</button>
             {#if st.previous_binary}<button class="btn sm" onclick={rollback} disabled={busy || running}><Undo2 size={14} /> Roll back</button>{/if}
             {#if st.custom_binary}<button class="btn sm danger" onclick={reset} disabled={busy || running}><Trash2 size={14} /> Reset to image</button>{/if}
           </div>

@@ -18,7 +18,10 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use crate::apply::Pipeline;
+use crate::caddy::control::{Control, NoControl};
 use crate::caddy::{Admin, Runner};
+use crate::notify;
+use crate::recovery::{Fallback, Outcome, Restarter};
 use crate::registry::{self, Capabilities};
 use crate::store::Store;
 
@@ -28,6 +31,9 @@ pub const DOWNLOAD_BASE: &str = "https://caddyserver.com";
 const CATALOG_KEY: &str = "plugin_catalog";
 const LATEST_KEY: &str = "caddy_latest";
 const STATE_KEY: &str = "plugins_state";
+
+/// Sends a notification: event, title, message.
+pub type NotifyFn = Arc<dyn Fn(&str, &str, &str) + Send + Sync>;
 
 /// Name of the custom build inside the shared bin directory.
 pub const CUSTOM_NAME: &str = "caddy-custom";
@@ -130,6 +136,10 @@ pub struct Manager {
     pub base_url: String,
     /// ask Caddy to restart after swapping binaries (off in tests)
     pub restart: bool,
+    /// Restarts Caddy and makes sure it serves, or rolls back.
+    pub restarter: Arc<Restarter>,
+    /// Sends a notification (event, title, message).
+    pub notify: Option<NotifyFn>,
     client: reqwest::Client,
     job: Mutex<Option<JobState>>,
     next_id: Mutex<u64>,
@@ -180,7 +190,7 @@ impl Manager {
     ) -> Manager {
         Manager {
             store,
-            admin,
+            admin: admin.clone(),
             caps,
             pipeline,
             caddy_bin,
@@ -188,12 +198,37 @@ impl Manager {
             github_token,
             base_url: DOWNLOAD_BASE.into(),
             restart: true,
+            restarter: Arc::new(Restarter::new(
+                admin.clone(),
+                Arc::new(NoControl),
+                Vec::new(),
+            )),
+            notify: None,
             client: crate::httpc::builder()
                 .timeout(Duration::from_secs(20 * 60))
                 .build()
                 .expect("http client"),
             job: Mutex::new(None),
             next_id: Mutex::new(1),
+        }
+    }
+
+    /// Sets how Caddy is restarted: the process control of this layout, the
+    /// addresses that must answer when Caddy serves, and where to notify.
+    pub fn with_recovery(
+        mut self,
+        control: Arc<dyn Control>,
+        probe_addrs: Vec<String>,
+        notify: Option<NotifyFn>,
+    ) -> Manager {
+        self.restarter = Arc::new(Restarter::new(self.admin.clone(), control, probe_addrs));
+        self.notify = notify;
+        self
+    }
+
+    fn send(&self, event: &str, title: &str, msg: &str) {
+        if let Some(n) = &self.notify {
+            n(event, title, msg);
         }
     }
 
@@ -667,7 +702,10 @@ impl Manager {
 
         // Swap binaries: keep the previous custom build for a rollback.
         let custom = self.custom_path();
-        if custom.exists() {
+        let had_custom = custom.exists();
+        let old_state: Option<State> = self.store.kv_get_json(STATE_KEY);
+        let old_version = self.caps().version_s;
+        if had_custom {
             let _ = std::fs::remove_file(self.prev_path());
             std::fs::rename(&custom, self.prev_path()).context("keep previous build")?;
         }
@@ -681,55 +719,144 @@ impl Manager {
                 installed_at: Some(Utc::now()),
             },
         );
-        self.store.audit(
-            user,
-            "plugins.install",
-            &new_version,
-            &desired.join(", "),
-            "",
-        );
 
-        if self.restart {
-            self.restart_caddy(&new_version, Some(&new_caps)).await?;
-        } else {
+        if !self.restart {
             self.log("Restart skipped");
+            self.audit_install(user, &new_version, &desired);
+            return Ok(());
         }
-        Ok(())
+        // Undo the swap: the build that served before this install.
+        let (dir, m_custom, m_prev) = (self.bin_dir(), custom.clone(), self.prev_path());
+        let undo = Fallback {
+            label: if old_version.is_empty() {
+                "the previous build".to_string()
+            } else {
+                format!("the previous build ({old_version})")
+            },
+            apply: Box::new(move || {
+                set_aside(&m_custom, &dir.join(format!("{CUSTOM_NAME}.failed")))?;
+                if had_custom {
+                    std::fs::rename(&m_prev, &m_custom).context("restore the previous build")?;
+                }
+                Ok(())
+            }),
+        };
+        let mut fallbacks = vec![undo];
+        if had_custom {
+            fallbacks.push(self.image_fallback());
+        }
+        match self
+            .restart_verified(Some((&new_version, &new_caps)), fallbacks)
+            .await
+        {
+            Ok(()) => {
+                self.audit_install(user, &new_version, &desired);
+                Ok(())
+            }
+            Err(e) => {
+                match old_state {
+                    Some(st) => {
+                        let _ = self.store.kv_set_json(STATE_KEY, &st);
+                    }
+                    None => {
+                        let _ = self.store.kv_set_json(STATE_KEY, &State::default());
+                    }
+                }
+                self.store.audit(
+                    user,
+                    "plugins.install_failed",
+                    &new_version,
+                    &format!("{e:#}"),
+                    "",
+                );
+                Err(e)
+            }
+        }
     }
 
-    /// Asks Caddy to exit so the container entrypoint starts the (new)
-    /// binary, then waits for it and re-detects capabilities.
-    async fn restart_caddy(
+    fn audit_install(&self, user: &str, version: &str, desired: &[String]) {
+        self.store
+            .audit(user, "plugins.install", version, &desired.join(", "), "");
+    }
+
+    /// Falls back to the image's built-in Caddy by setting the custom build
+    /// aside.
+    fn image_fallback(&self) -> Fallback {
+        let (custom, broken) = (
+            self.custom_path(),
+            self.bin_dir().join(format!("{CUSTOM_NAME}.broken")),
+        );
+        Fallback {
+            label: "the image's built-in Caddy".into(),
+            apply: Box::new(move || set_aside(&custom, &broken)),
+        }
+    }
+
+    /// Restarts Caddy and makes sure it serves (and, with `expect`, that it
+    /// is the expected build); otherwise rolls back through `fallbacks`. An
+    /// error says what happened and what to do, and was also notified.
+    async fn restart_verified(
         &self,
-        expect_version: &str,
-        expect_caps: Option<&Capabilities>,
+        expect: Option<(&str, &Capabilities)>,
+        fallbacks: Vec<Fallback>,
     ) -> Result<()> {
-        self.log("Restarting Caddy…");
-        self.admin.stop().await.context("ask Caddy to stop")?;
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        self.admin
-            .wait_ready(Duration::from_secs(120))
-            .await
-            .context("Caddy did not come back")?;
-        // The entrypoint copies the binary it runs into the shared volume.
+        let log = |l: &str| self.log(l);
+        let check =
+            || -> crate::apply::BoxFut<'_, Result<()>> { Box::pin(self.refresh_caps(expect)) };
+        match self.restarter.restart(&log, &check, &fallbacks).await {
+            Outcome::Serving => Ok(()),
+            Outcome::RolledBack { to, why } => {
+                let _ = self.refresh_caps(None).await;
+                let msg = format!(
+                    "The restarted Caddy did not serve: {why}. Rolled back to {to}, which is serving your sites again. \
+                     Nothing to do right now; see the job log on the Plugins page for details."
+                );
+                self.send(notify::EVENT_CADDY_RECOVERED, "Caddy rolled back", &msg);
+                Err(anyhow!(msg))
+            }
+            Outcome::Down { why } => {
+                let msg = format!(
+                    "Caddy is not serving: {why}. Restarting it and rolling back did not help. \
+                     Check the Caddy log (docker logs on the Caddy container), fix the cause, then use Restart on the Plugins page."
+                );
+                self.send(notify::EVENT_CADDY_DOWN, "Caddy is down", &msg);
+                Err(anyhow!(msg))
+            }
+        }
+    }
+
+    /// Re-detects the running Caddy and, with `expect`, checks it is that
+    /// build with those plugins.
+    async fn refresh_caps(&self, expect: Option<(&str, &Capabilities)>) -> Result<()> {
+        // The supervisor/entrypoint copies the binary it runs into place.
         let mut caps = Capabilities::default();
         for _ in 0..20 {
-            tokio::time::sleep(Duration::from_millis(500)).await;
             if let Ok(c) = Runner::new(&self.caddy_bin).capabilities().await {
                 caps = c;
-                if caps.version_s == expect_version {
+                if expect.is_none_or(|(v, _)| caps.version_s == v) {
                     break;
                 }
             }
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
         if caps.detected {
             if let Ok(mut w) = self.caps.write() {
                 *w = caps.clone();
             }
         }
+        let Some((expect_version, want)) = expect else {
+            if caps.detected {
+                self.log(&format!(
+                    "Caddy {} is running with {} modules",
+                    caps.version_s,
+                    caps.modules.len()
+                ));
+            }
+            return Ok(());
+        };
         if caps.version_s != expect_version {
             return Err(anyhow!(
-                "Caddy is back but reports {} instead of {expect_version}; the container may have fallen back to its built-in binary (check its logs)",
+                "Caddy came back as {} instead of {expect_version}",
                 if caps.version_s.is_empty() {
                     "an unknown version".to_string()
                 } else {
@@ -737,17 +864,14 @@ impl Manager {
                 }
             ));
         }
-        if let Some(want) = expect_caps {
-            let wanted = want.plugin_packages();
-            let have = caps.plugin_packages();
-            let missing: Vec<&str> = wanted
-                .keys()
-                .filter(|p| !have.contains_key(*p))
-                .map(|s| s.as_str())
-                .collect();
-            if !missing.is_empty() {
-                return Err(anyhow!("Caddy restarted without: {}", missing.join(", ")));
-            }
+        let have = caps.plugin_packages();
+        let missing: Vec<String> = want
+            .plugin_packages()
+            .into_keys()
+            .filter(|p| !have.contains_key(p))
+            .collect();
+        if !missing.is_empty() {
+            return Err(anyhow!("Caddy restarted without: {}", missing.join(", ")));
         }
         self.log(&format!(
             "Caddy {} is running with {} modules",
@@ -769,14 +893,40 @@ impl Manager {
                 let _ = std::fs::remove_file(m.prev_path());
                 std::fs::rename(m.custom_path(), m.prev_path()).context("remove custom build")?;
                 m.log("Custom build removed; Caddy will start from the image's built-in binary");
+                let old_state: Option<State> = m.store.kv_get_json(STATE_KEY);
                 let _ = m.store.kv_set_json(STATE_KEY, &State::default());
                 m.store.audit(&user, "plugins.reset", "", "", "");
                 if m.restart {
-                    m.restart_any().await?;
+                    let (custom, prev) = (m.custom_path(), m.prev_path());
+                    let undo = Fallback {
+                        label: "the custom build".into(),
+                        apply: Box::new(move || {
+                            std::fs::rename(&prev, &custom).context("restore the custom build")
+                        }),
+                    };
+                    if let Err(e) = m.restart_verified(None, vec![undo]).await {
+                        if let Some(st) = old_state {
+                            let _ = m.store.kv_set_json(STATE_KEY, &st);
+                        }
+                        return Err(e);
+                    }
                 }
                 Ok(())
             }
             .await;
+            m.finish(r);
+        });
+        Ok(job)
+    }
+
+    /// Restarts Caddy (killing it if it does not answer) and makes sure it
+    /// serves; falls back to the image's Caddy when the custom build won't.
+    pub fn start_restart(self: &Arc<Self>, user: String) -> Result<JobState> {
+        let job = self.start_job("restart", Vec::new())?;
+        let m = self.clone();
+        tokio::spawn(async move {
+            m.store.audit(&user, "caddy.restart", "", "", "");
+            let r = m.restart_verified(None, vec![m.image_fallback()]).await;
             m.finish(r);
         });
         Ok(job)
@@ -807,7 +957,19 @@ impl Manager {
                 ));
                 m.store.audit(&user, "plugins.rollback", &v, "", "");
                 if m.restart {
-                    m.restart_any().await?;
+                    let (custom, prev, swap) = (m.custom_path(), m.prev_path(), tmp.clone());
+                    let undo = Fallback {
+                        label: "the build that ran before the rollback".into(),
+                        apply: Box::new(move || {
+                            std::fs::rename(&custom, &swap)?;
+                            std::fs::rename(&prev, &custom)
+                                .context("restore the build that ran before")?;
+                            std::fs::rename(&swap, &prev)?;
+                            Ok(())
+                        }),
+                    };
+                    let image = m.image_fallback();
+                    m.restart_verified(None, vec![undo, image]).await?;
                 }
                 Ok(())
             }
@@ -816,29 +978,16 @@ impl Manager {
         });
         Ok(job)
     }
+}
 
-    /// Restart without a version expectation (reset/rollback).
-    async fn restart_any(&self) -> Result<()> {
-        self.log("Restarting Caddy…");
-        self.admin.stop().await.context("ask Caddy to stop")?;
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        self.admin
-            .wait_ready(Duration::from_secs(120))
-            .await
-            .context("Caddy did not come back")?;
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        if let Ok(c) = Runner::new(&self.caddy_bin).capabilities().await {
-            self.log(&format!(
-                "Caddy {} is running with {} modules",
-                c.version_s,
-                c.modules.len()
-            ));
-            if let Ok(mut w) = self.caps.write() {
-                *w = c;
-            }
-        }
-        Ok(())
+/// Moves a binary out of the way (replacing an older one there); a missing
+/// binary is fine.
+fn set_aside(bin: &Path, to: &Path) -> Result<()> {
+    if !bin.exists() {
+        return Ok(());
     }
+    let _ = std::fs::remove_file(to);
+    std::fs::rename(bin, to).with_context(|| format!("move {} aside", bin.display()))
 }
 
 fn installed_from(caps: &Capabilities) -> Vec<Installed> {
@@ -1126,5 +1275,180 @@ mod tests {
                 .version,
             "v0.2.4"
         );
+    }
+
+    fn free_port() -> u16 {
+        std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
+    }
+
+    /// The whole update path against a real Caddy run by the supervisor: a
+    /// good build is installed and serves; then a build that hangs instead
+    /// of serving is installed, is killed, retried once and rolled back, and
+    /// the previous build serves again, with a notification. Needs CADDY_BIN
+    /// (and a Unix shell for the hanging stand-in).
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn update_rolls_back_a_build_that_hangs() {
+        use crate::caddy::control::ProcessHandle;
+        let Ok(bin) = std::env::var("CADDY_BIN") else {
+            return;
+        };
+        let bin = std::fs::canonicalize(bin).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let (admin_port, site_port) = (free_port(), free_port());
+        let admin_addr = format!("127.0.0.1:{admin_port}");
+        let managed = crate::supervisor::Managed {
+            image_bin: bin.clone(),
+            caddy_bin: dir.path().join("bin").join("caddy"),
+            caddyfile: dir.path().join("Caddyfile"),
+            admin_listen: admin_addr.clone(),
+            admin_origins: vec![admin_addr.clone()],
+            secrets_dir: dir.path().join("secrets"),
+            log_dir: dir.path().join("logs"),
+            data_dir: dir.path().join("data"),
+            config_dir: dir.path().join("config"),
+        };
+        std::fs::write(
+            &managed.caddyfile,
+            format!(
+                "{{\n\tadmin {admin_addr} {{\n\t\torigins {admin_addr}\n\t}}\n}}\n:{site_port} {{\n\trespond \"ok\"\n}}\n"
+            ),
+        )
+        .unwrap();
+        managed.prepare().unwrap();
+
+        // A stand-in for caddyserver.com that serves whatever `payload` holds.
+        let payload = Arc::new(Mutex::new(std::fs::read(&bin).unwrap()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let p = payload.clone();
+        let app = axum::Router::new().route(
+            "/api/download",
+            axum::routing::get(move || {
+                let p = p.clone();
+                async move { p.lock().unwrap().clone() }
+            }),
+        );
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let admin = Arc::new(Admin::new(&admin_addr));
+        let process = Arc::new(ProcessHandle::default());
+        let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+        let sup = tokio::spawn(managed.clone().run(admin.clone(), process.clone(), stop_rx));
+        admin
+            .wait_ready(Duration::from_secs(20))
+            .await
+            .expect("caddy up");
+
+        let store = Arc::new(
+            Store::open_memory(Arc::new(crate::secrets::SecretBox::new(b"k").unwrap())).unwrap(),
+        );
+        let runner = Arc::new(Runner::new(&managed.caddy_bin));
+        let caps = Arc::new(RwLock::new(runner.capabilities().await.unwrap()));
+        let pipeline = Arc::new(Pipeline::new(crate::apply::PipelineParts {
+            store: store.clone(),
+            validator: runner.clone(),
+            admin: admin.clone(),
+            health: Arc::new(crate::apply::DefaultHealth {
+                admin: admin.clone(),
+                probe_addrs: vec![],
+                settle: Duration::ZERO,
+            }),
+            secrets: None,
+            env: crate::generator::Env {
+                admin_listen: admin_addr.clone(),
+                log_dir: crate::secrets::to_slash(&dir.path().join("logs")),
+                ..Default::default()
+            },
+            persist_path: dir.path().join("Caddyfile.generated"),
+            caps: caps.clone(),
+            notify: None,
+        }));
+        let sent = Arc::new(Mutex::new(Vec::<String>::new()));
+        let s2 = sent.clone();
+        let mut m = Manager::new(
+            store.clone(),
+            admin.clone(),
+            caps.clone(),
+            pipeline,
+            managed.caddy_bin.clone(),
+            String::new(),
+            String::new(),
+        )
+        .with_recovery(
+            process.clone(),
+            vec![format!("127.0.0.1:{site_port}")],
+            Some(Arc::new(move |e: &str, _t: &str, _m: &str| {
+                s2.lock().unwrap().push(e.to_string())
+            })),
+        );
+        m.base_url = base;
+        {
+            let r = Arc::get_mut(&mut m.restarter).unwrap();
+            r.timing.up = Duration::from_secs(10);
+            r.timing.down = Duration::from_secs(5);
+            r.timing.stop = Duration::from_secs(3);
+        }
+        let m = Arc::new(m);
+        let wait = |m: Arc<Manager>| async move {
+            for _ in 0..1200 {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                if let Some(j) = m.current_job() {
+                    if j.status != "running" {
+                        return j;
+                    }
+                }
+            }
+            panic!("job did not finish");
+        };
+
+        // 1. A good build: installed, restarted, serving.
+        m.start_install(vec![], vec![], "t".into()).unwrap();
+        let j = wait(m.clone()).await;
+        assert_eq!(j.status, "done", "{}", j.log.join("\n"));
+        m.restarter
+            .serving()
+            .await
+            .expect("serving after a good update");
+
+        // 2. A build that passes every check but hangs instead of serving.
+        let mut script = format!(
+            "#!/bin/sh\nif [ \"$1\" = run ]; then exec sleep 600; fi\nexec '{}' \"$@\"\n",
+            bin.display()
+        );
+        script.push_str(&format!("# {}\n", "x".repeat(2 << 20)));
+        *payload.lock().unwrap() = script.into_bytes();
+        m.start_install(vec![], vec![], "t".into()).unwrap();
+        let j = wait(m.clone()).await;
+        let log = j.log.join("\n");
+        assert_eq!(j.status, "failed", "{log}");
+        assert!(
+            j.error.contains("Rolled back to the previous build"),
+            "{}",
+            j.error
+        );
+        assert!(log.contains("restarting once more"), "{log}");
+        m.restarter
+            .serving()
+            .await
+            .expect("the previous build serves again");
+        assert!(
+            m.custom_path().exists(),
+            "the previous build is back in place"
+        );
+        assert!(m.bin_dir().join("caddy-custom.failed").exists());
+        assert!(
+            Runner::new(m.custom_path()).version().await.is_ok()
+                && std::fs::metadata(m.custom_path()).unwrap().len() > 10 << 20,
+            "the real binary, not the stand-in"
+        );
+        assert_eq!(*sent.lock().unwrap(), vec![notify::EVENT_CADDY_RECOVERED]);
+
+        stop_tx.send(true).unwrap();
+        let _ = tokio::time::timeout(Duration::from_secs(30), sup).await;
     }
 }

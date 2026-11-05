@@ -708,6 +708,7 @@ pub fn router(st: Arc<AppState>) -> Router {
         .route("/plugins/job", get(plugin_handlers::job))
         .route("/plugins/reset", post(plugin_handlers::reset))
         .route("/plugins/rollback", post(plugin_handlers::rollback))
+        .route("/plugins/restart", post(plugin_handlers::restart))
         .route("/updates/check", post(plugin_handlers::updates_check))
         .route("/backup", get(ops::backup_download))
         .route("/backup/restore", post(ops::backup_restore))

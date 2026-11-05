@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::sync::watch;
 
+use crate::caddy::control::ProcessHandle;
 use crate::caddy::{Admin, Runner};
 use crate::plugins::CUSTOM_NAME;
 use crate::secrets;
@@ -137,8 +138,15 @@ impl Managed {
     }
 
     /// Runs Caddy until `shutdown` turns true, restarting it whenever it
-    /// exits. On shutdown Caddy is asked to stop gracefully first.
-    pub async fn run(self, admin: std::sync::Arc<Admin>, mut shutdown: watch::Receiver<bool>) {
+    /// exits. On shutdown Caddy is asked to stop gracefully first. `handle`
+    /// lets the rest of the panel kill a Caddy that stopped answering.
+    pub async fn run(
+        self,
+        admin: std::sync::Arc<Admin>,
+        handle: std::sync::Arc<ProcessHandle>,
+        mut shutdown: watch::Receiver<bool>,
+    ) {
+        let mut kills = handle.kill_requests();
         loop {
             if *shutdown.borrow() {
                 return;
@@ -177,8 +185,17 @@ impl Managed {
                     continue;
                 }
             };
+            let generation = handle.started();
+            kills.mark_unchanged();
+            let mut killed = false;
             let status = tokio::select! {
                 s = child.wait() => s.ok(),
+                _ = kill_requested(&mut kills, generation) => {
+                    tracing::warn!("caddy stopped answering; killing it");
+                    killed = true;
+                    let _ = child.kill().await;
+                    child.wait().await.ok()
+                }
                 _ = shutdown.changed() => {
                     tracing::info!("stopping caddy");
                     let _ = tokio::time::timeout(Duration::from_secs(10), admin.stop()).await;
@@ -191,7 +208,9 @@ impl Managed {
             };
             let code = status.and_then(|s| s.code()).unwrap_or(-1);
             let ran = started.elapsed();
-            if code != 0 && ran < Duration::from_secs(20) {
+            // A process killed on request is handled by whoever asked (it
+            // picks the binary to fall back to); only crashes are set aside.
+            if code != 0 && !killed && ran < Duration::from_secs(20) {
                 self.quarantine(
                     &bin,
                     &format!("exited with {code} after {:.1}s", ran.as_secs_f64()),
@@ -221,6 +240,18 @@ impl Managed {
                     broken.display()
                 );
             }
+        }
+    }
+}
+
+/// Resolves when a kill of process `generation` is requested.
+async fn kill_requested(kills: &mut watch::Receiver<u64>, generation: u64) {
+    loop {
+        if kills.changed().await.is_err() {
+            std::future::pending::<()>().await;
+        }
+        if *kills.borrow_and_update() == generation {
+            return;
         }
     }
 }
@@ -272,7 +303,8 @@ mod tests {
         assert_eq!(m.choose().await, PathBuf::from(&bin));
         let admin = Arc::new(Admin::new(&admin_addr));
         let (tx, rx) = watch::channel(false);
-        let task = tokio::spawn(m.clone().run(admin.clone(), rx));
+        let handle = Arc::new(ProcessHandle::default());
+        let task = tokio::spawn(m.clone().run(admin.clone(), handle.clone(), rx));
         admin
             .wait_ready(Duration::from_secs(20))
             .await

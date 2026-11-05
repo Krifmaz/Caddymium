@@ -17,6 +17,7 @@ mod importer;
 mod model;
 mod notify;
 mod plugins;
+mod recovery;
 mod registry;
 mod scan;
 mod secrets;
@@ -114,15 +115,40 @@ async fn run(cfg: config::Config) -> Result<()> {
             n.send(event, "Caddymium: config not applied", msg)
         })),
     }));
-    let plugins = Arc::new(plugins::Manager::new(
-        store.clone(),
-        admin.clone(),
-        caps.clone(),
-        pipeline.clone(),
-        cfg.caddy_bin.clone(),
-        cfg.caddy_arch.clone(),
-        cfg.github_token.clone(),
-    ));
+    // How a Caddy that stopped answering is killed: the supervisor owns the
+    // process in the all-in-one image; the caddy container's entrypoint
+    // watches the shared bin volume in the two-container layout.
+    let process = Arc::new(caddy::control::ProcessHandle::default());
+    let control: Arc<dyn caddy::control::Control> = if cfg.manage_caddy {
+        process.clone()
+    } else {
+        Arc::new(caddy::control::FileControl {
+            bin_dir: cfg
+                .caddy_bin
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_default(),
+        })
+    };
+    let n = notifier.clone();
+    let plugins = Arc::new(
+        plugins::Manager::new(
+            store.clone(),
+            admin.clone(),
+            caps.clone(),
+            pipeline.clone(),
+            cfg.caddy_bin.clone(),
+            cfg.caddy_arch.clone(),
+            cfg.github_token.clone(),
+        )
+        .with_recovery(
+            control,
+            cfg.probe_addrs.clone(),
+            Some(Arc::new(move |event: &str, title: &str, msg: &str| {
+                n.send(event, title, msg)
+            })),
+        ),
+    );
 
     // Built-in CrowdSec lives in the data volume; it needs Caddy in the same
     // container (all-in-one), since its API listens on loopback.
@@ -182,7 +208,7 @@ async fn run(cfg: config::Config) -> Result<()> {
         };
         managed.prepare().context("prepare caddy directories")?;
         bootstrap_managed_config(&managed, &state).await;
-        tokio::spawn(managed.run(state.admin.clone(), stop_rx.clone()));
+        tokio::spawn(managed.run(state.admin.clone(), process.clone(), stop_rx.clone()));
     }
 
     // Update checker and automatic Caddy updates (settings decide what it does).
