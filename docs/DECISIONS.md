@@ -19,3 +19,6 @@ Non-obvious calls, one line each, newest last.
 - 2026-11-05 · Two-container layout: the panel kills a hung Caddy through `caddy.kill` in the shared bin volume,
   watched by the caddy image's entrypoint (`caddy.gen` counts starts). An older caddy image without this gets a
   clear "restart the Caddy container" message instead.
+- 2026-11-05 · The watchdog checks every 5s and only counts while Caddy should run (detected, no plugin job or
+  restart in progress). Its restart is a normal job on the Plugins page ("watchdog") so its log is visible; the
+  sidebar shows the last one for 24h. `CADDYMIUM_WATCHDOG=false` turns it off.

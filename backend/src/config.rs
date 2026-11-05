@@ -51,6 +51,8 @@ pub struct Config {
     pub base_url: String,
     /// Trust X-Forwarded-For from Caddy for client IPs.
     pub trust_proxy_headers: bool,
+    /// Restart Caddy when it stops serving for a minute.
+    pub watchdog: bool,
     /// Optional fixed setup token.
     pub setup_token: String,
     pub initial_admin_user: String,
@@ -224,6 +226,7 @@ impl Config {
                 .trim_end_matches('/')
                 .to_string(),
             trust_proxy_headers: env_bool("CADDYMIUM_TRUST_PROXY_HEADERS", false),
+            watchdog: env_bool("CADDYMIUM_WATCHDOG", true),
             setup_token: env_secret("CADDYMIUM_SETUP_TOKEN"),
             initial_admin_user: lookup("CADDYMIUM_INITIAL_ADMIN_USER").unwrap_or_default(),
             initial_admin_pass: env_secret("CADDYMIUM_INITIAL_ADMIN_PASSWORD"),
