@@ -106,12 +106,12 @@ jobs:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v3
       - name: Build panel
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
       - name: Build caddy
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./caddy
           push: false
