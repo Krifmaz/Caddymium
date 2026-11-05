@@ -6,7 +6,8 @@
     Puzzle, Signal, Shield,
   } from '@lucide/svelte'
   import { api, setCSRF, handleUnauthorized } from './lib/api.js'
-  import { app, refreshStatus, can } from './lib/state.svelte.js'
+  import { app, refreshStatus, can, closeToast } from './lib/state.svelte.js'
+  import CopyButton from './lib/CopyButton.svelte'
   import { route, go } from './lib/router.svelte.js'
   import { theme, setTheme } from './lib/theme.svelte.js'
   import CommandPalette from './lib/CommandPalette.svelte'
@@ -230,7 +231,12 @@
 <div class="toasts" aria-live="polite">
   {#each app.toasts as t (t.id)}
     {@const Icon = toastIcon[t.kind] || Info}
-    <div class="toast {t.kind}"><Icon size={18} /><span>{t.message}</span></div>
+    <div class="toast {t.kind}" role={t.kind === 'err' ? 'alert' : 'status'}>
+      <Icon size={18} />
+      <span class="msg">{t.message}{#if t.count > 1} <span class="count">×{t.count}</span>{/if}</span>
+      {#if t.kind === 'err'}<CopyButton text={t.message} />{/if}
+      <button class="btn ghost icon sm" aria-label="Close" title="Close" onclick={() => closeToast(t.id)}><X size={14} /></button>
+    </div>
   {/each}
 </div>
 
@@ -324,6 +330,9 @@
     font-size: 13.5px; animation: slide 0.22s ease-out;
   }
   .toast :global(svg) { flex: none; margin-top: 1px; }
+  .toast .msg { flex: 1; min-width: 0; user-select: text; }
+  .toast .count { color: var(--muted); font-size: 12px; }
+  .toast :global(.btn) { margin-top: -4px; margin-bottom: -4px; }
   .toast.ok :global(svg) { color: var(--ok); }
   .toast.err :global(svg) { color: var(--danger); }
   @keyframes slide { from { opacity: 0; transform: translateY(-8px) scale(0.98); } }

@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { Plus, ShieldCheck, KeyRound, TriangleAlert, Info, Pencil, Trash2 } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
@@ -130,7 +131,7 @@
       </label>
       <label class="check"><input type="checkbox" bind:checked={editDom.wildcard} /> Use one wildcard certificate (*.{editDom.name || 'domain'}) for all subdomains</label>
     {/if}
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       <button class="btn" onclick={() => (editDom = null)}>Cancel</button>
       <button class="btn primary" onclick={saveDomain}>Save</button>
@@ -159,7 +160,7 @@
       {/each}
       <p class="muted small">Tip: instead of the value you can enter <code>env:VAR_NAME</code> or <code>file:/run/secrets/name</code> to read it from the Caddy container.</p>
     {/if}
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       <button class="btn" onclick={() => (editCred = null)}>Cancel</button>
       <button class="btn primary" onclick={saveCred}>Save</button>

@@ -846,3 +846,28 @@ async fn security_suggestions_card() {
         .await;
     assert_eq!(code, 400);
 }
+
+#[tokio::test]
+async fn errors_say_what_to_do() {
+    use axum::response::IntoResponse;
+    use http_body_util::BodyExt;
+    let body = |e: ApiError| async move {
+        let r = e.into_response();
+        let b = r.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice::<Value>(&b).unwrap()["error"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let m = body(ApiError::internal("database is locked")).await;
+    assert!(
+        m.starts_with("Something went wrong: database is locked."),
+        "{m}"
+    );
+    assert!(m.contains("docker logs caddymium"), "{m}");
+    let m = body(ApiError::bad("host is required")).await;
+    assert_eq!(m, "host is required", "client errors are already specific");
+    let nf = ApiError::from(anyhow::Error::new(crate::store::NotFound));
+    let m = body(nf).await;
+    assert!(m.contains("Reload the page"), "{m}");
+}

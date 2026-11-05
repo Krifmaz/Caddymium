@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { CircleAlert, ShieldCheck, Rocket, Undo2, GitCompareArrows } from '@lucide/svelte'
   import { api, setCSRF } from '../lib/api.js'
   import { app } from '../lib/state.svelte.js'
@@ -65,7 +66,7 @@
         <label class="field"><span>Password</span><input type="password" autocomplete="current-password" bind:value={password} required /></label>
       {/if}
 
-      {#if error}<div class="alert err"><CircleAlert /><span>{error}</span></div>{/if}
+      {#if error}<ErrorBox message={error} />{/if}
       <button class="btn primary big" type="submit" disabled={busy}>
         {busy ? 'Please wait…' : twofa ? 'Verify' : setup ? 'Create account' : 'Log in'}
       </button>

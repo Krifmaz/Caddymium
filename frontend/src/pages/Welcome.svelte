@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
   import { app, toastErr, refreshStatus } from '../lib/state.svelte.js'
@@ -51,7 +52,7 @@
           <option value="zerossl">ZeroSSL</option>
           <option value="google">Google Trust Services</option>
         </select></label>
-      {#if error}<div class="alert err">{error}</div>{/if}
+      {#if error}<ErrorBox message={error} />{/if}
       <div class="row"><button class="btn primary" onclick={saveBasics}>Continue</button></div>
     </div>
   {:else if step === 2}

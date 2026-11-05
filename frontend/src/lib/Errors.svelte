@@ -1,5 +1,6 @@
 <script>
   import { CircleX } from '@lucide/svelte'
+  import CopyButton from './CopyButton.svelte'
   // Shows caddy adapt/validate messages from a plan.
   let { plan } = $props()
 </script>
@@ -13,6 +14,7 @@
         {#each plan.errors || [] as e}<li class="mono">{e.text}</li>{/each}
       </ul>
     </div>
+    <CopyButton text={`Caddy rejected this config at the ${plan.stage} step.\n` + (plan.errors || []).map((e) => e.text).join('\n')} />
   </div>
 {/if}
 

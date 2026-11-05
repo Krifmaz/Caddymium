@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { Shield, ShieldCheck, Bot, EyeOff, Gauge, House, KeyRound, RefreshCw, Download, Power, Trash2, Plus, CircleCheck, CircleX, TriangleAlert, Info, ChevronDown, Rocket, LogOut, Ban } from '@lucide/svelte'
   import { api } from '../lib/api.js'
@@ -227,7 +228,7 @@
             </select></div>
         </div>
       </div>
-      {#if error}<div class="alert err"><CircleX /><span>{error}</span></div>{/if}
+      {#if error}<ErrorBox message={error} />{/if}
       {#if can.admin()}<div class="row"><button class="btn primary" onclick={save} disabled={busy}>Save</button></div>{/if}
     </div>
 
@@ -370,11 +371,11 @@
       {#if cs.enabled && !d.plugins.crowdsec}
         <div class="alert warn"><TriangleAlert /><span>Caddy doesn't have the CrowdSec bouncer plugin yet, so bans aren't enforced. {#if can.admin()}<button class="btn xs" onclick={installBouncer}>Install it</button>{/if}</span></div>
       {/if}
-      {#if cs.last_auto && !cs.last_auto.ok}<div class="alert err"><CircleX /><span>Automatic update to {cs.last_auto.to} failed: {cs.last_auto.error}</span></div>{/if}
+      {#if cs.last_auto && !cs.last_auto.ok}<ErrorBox title={`Automatic update to ${cs.last_auto.to} failed`} message={cs.last_auto.error} />{/if}
       {#if cs.job}
         <div class="row tight small"><span class="badge {cs.job.status === 'failed' ? 'err' : cs.job.status === 'done' ? 'ok' : 'accent'}">{cs.job.kind}: {cs.job.status}</span>
           <button class="btn ghost xs" onclick={() => (showLog = !showLog)}><ChevronDown size={13} /> {showLog ? 'Hide' : 'Show'} log</button></div>
-        {#if cs.job.status === 'failed'}<div class="alert err"><CircleX /><span>{cs.job.error}</span></div>{/if}
+        {#if cs.job.status === 'failed'}<ErrorBox message={cs.job.error} />{/if}
         {#if showLog}<pre class="log">{cs.job.log.join('\n')}</pre>{/if}
       {/if}
       {#if cs.running}

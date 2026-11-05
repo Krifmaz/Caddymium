@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { Plus, Braces, FileCode, Check, Pencil } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
@@ -112,7 +113,7 @@
       <button class="btn sm" onclick={validate}><Check size={15} /> Check syntax</button>
       {#if check}{#if check.valid}<span class="badge ok">looks valid</span>{:else}<span class="mono small" style="color:var(--danger)">{check.error}</span>{/if}{/if}
     </div>
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       {#if edit.id}<button class="btn danger" style="margin-right:auto" onclick={del}>Delete</button>{/if}
       <button class="btn" onclick={() => (edit = null)}>Cancel</button>

@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { Plus, KeyRound } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
@@ -104,7 +105,7 @@
       <label class="check"><input type="checkbox" bind:checked={edit.disabled} /> Disabled (can't log in)</label>
       {#if edit.totp_enabled}<label class="check"><input type="checkbox" bind:checked={edit.reset_2fa} /> Reset two-factor (lost phone)</label>{/if}
     {/if}
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       {#if edit.id && edit.id !== app.me.user.id}<button class="btn danger" style="margin-right:auto" onclick={delUser}>Delete</button>{/if}
       <button class="btn" onclick={() => (edit = null)}>Cancel</button>
@@ -118,7 +119,7 @@
     <label class="field"><span>Name</span><input type="text" bind:value={newKey.name} placeholder="backup script" /></label>
     <label class="field"><span>Role</span><select bind:value={newKey.role}>{#each ['viewer', 'editor', 'admin'] as r}<option value={r}>{r}</option>{/each}</select></label>
     <label class="field"><span>Expires after (days, 0 = never)</span><input type="number" bind:value={newKey.valid_days} /></label>
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       <button class="btn" onclick={() => (newKey = null)}>Cancel</button>
       <button class="btn primary" onclick={createKey}>Create</button>

@@ -159,9 +159,19 @@ impl ApiError {
     }
 }
 
+/// What to do after an unexpected server error.
+const SERVER_ERROR_HINT: &str = "Try again; if it keeps failing, copy this message and check the panel's log (docker logs caddymium).";
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        json(self.0, &serde_json::json!({"error": self.1}))
+        let msg = if self.0.is_server_error() {
+            tracing::error!(status = self.0.as_u16(), "{}", self.1);
+            let m = self.1.trim_end_matches('.');
+            format!("Something went wrong: {m}. {SERVER_ERROR_HINT}")
+        } else {
+            self.1
+        };
+        json(self.0, &serde_json::json!({"error": msg}))
     }
 }
 
@@ -169,7 +179,10 @@ impl IntoResponse for ApiError {
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> ApiError {
         if store::is_not_found(&err) {
-            return ApiError(StatusCode::NOT_FOUND, "not found".into());
+            return ApiError(
+                StatusCode::NOT_FOUND,
+                "Not found: it may have been deleted meanwhile. Reload the page.".into(),
+            );
         }
         let msg = format!("{err:#}");
         if msg.contains("UNIQUE constraint") {
