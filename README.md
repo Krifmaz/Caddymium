@@ -159,7 +159,7 @@ All configuration is environment variables (see [.env.example](.env.example)). T
 
 ## Development
 
-Requirements: Rust 1.85+ and Node 24+. A Caddy binary is optional; with one, the tests also run against real Caddy (set `CADDY_BIN`). A build with plugins, for the dynamic DNS and forward proxy cases, comes from the download service: `https://caddyserver.com/api/download?os=linux&arch=amd64&p=github.com/mholt/caddy-dynamicdns&p=github.com/caddyserver/forwardproxy`.
+Requirements: Rust 1.85+, the `wasm32-unknown-unknown` target and [trunk](https://trunkrs.dev) 0.22 for the web app. A Caddy binary is optional; with one, the tests also run against real Caddy (set `CADDY_BIN`). A build with plugins, for the dynamic DNS and forward proxy cases, comes from the download service: `https://caddyserver.com/api/download?os=linux&arch=amd64&p=github.com/mholt/caddy-dynamicdns&p=github.com/caddyserver/forwardproxy`.
 
 ```sh
 # backend
@@ -167,11 +167,10 @@ cd backend
 cargo test                           # CADDY_BIN=/path/to/caddy cargo test for the real-Caddy tests
 cargo run                            # see src/config.rs for env vars; UPDATE_GOLDEN=1 cargo test rewrites generator goldens
 
-# frontend (proxies /api to localhost:8080)
-cd frontend
-npm install
-npm run dev
-npm run build                        # writes backend/ui/dist, embedded by cargo build
+# web app (Leptos on the Krifmaz kit)
+rustup target add wasm32-unknown-unknown
+cd web
+trunk build --release                # writes backend/ui/dist, embedded by cargo build and served at /
 ```
 
 Layout:
@@ -198,8 +197,8 @@ backend/src/
   notify.rs     notification channels (webhooks, ntfy, Gotify, email, …)
   kit.rs        Krifmaz kit server crates: health, What's new, notices, bug reports, diagnostics
   settings_form.rs  Settings pages from settings.toml (kit-server-settings) over the settings document
-frontend/       Svelte 5 UI (the classic UI, served at /)
-web/            the web app on the Krifmaz kit (Leptos, trunk), served at /next/ while pages move over
+  web.rs        serves the embedded web app (backend/ui/dist) at /
+web/            the web app on the Krifmaz kit (Leptos, trunk)
 caddy/          Caddy image (xcaddy + plugins) and entrypoint
 ```
 

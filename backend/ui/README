@@ -1,1 +1,1 @@
-The web UI build (frontend/) is written to ui/dist and embedded into the binary.
+The web app (web/, built with trunk) is written to ui/dist and embedded into the binary.

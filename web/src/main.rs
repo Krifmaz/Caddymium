@@ -7,8 +7,7 @@
 //! | after signing in | the What's new popup, once per release |
 //! | `#/<page>` | the panel's pages ([`pages`]) |
 //!
-//! Until every page is here, the app is served at `/next/` next to the classic UI at `/`; a page that is not here
-//! yet links to its classic version.
+//! The server embeds the build (`backend/ui/dist`) and serves it at `/`.
 
 mod app;
 mod form;

@@ -19,8 +19,6 @@ pub mod users;
 pub mod welcome;
 
 use crate::app::Route;
-use crate::ui::Classic;
-use crate::NAV;
 use leptos::prelude::*;
 
 /// The page for `route`.
@@ -51,15 +49,9 @@ pub fn page(route: &Route) -> AnyView {
         "bug-reports" => view! { <kit::BugReports/> }.into_any(),
         "diagnostics" => view! { <kit::Diagnostics/> }.into_any(),
         "whats-new" => view! { <kit::WhatsNew/> }.into_any(),
-        p => {
-            let item = NAV.iter().flat_map(|(_, items)| items.iter()).find(|i| i.path == p);
-            match item {
-                Some(i) => view! { <Classic title=i.label path=route.path.trim_start_matches('/').to_string()/> }.into_any(),
-                None => view! {
-                    <div class="empty"><h2>"Page not found"</h2><p><a class="btn" href="#/sites">"Go to sites"</a></p></div>
-                }
-                .into_any(),
-            }
+        _ => view! {
+            <div class="empty"><h2>"Page not found"</h2><p><a class="btn" href="#/sites">"Go to sites"</a></p></div>
         }
+        .into_any(),
     }
 }
