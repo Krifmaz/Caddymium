@@ -3,6 +3,7 @@
 //! /config, /reverse_proxy/upstreams, /metrics, /stop).
 
 pub mod admin;
+pub mod control;
 pub mod runner;
 
 pub use admin::Admin;
