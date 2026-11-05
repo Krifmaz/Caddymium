@@ -22,3 +22,8 @@ Non-obvious calls, one line each, newest last.
 - 2026-11-05 · The watchdog checks every 5s and only counts while Caddy should run (detected, no plugin job or
   restart in progress). Its restart is a normal job on the Plugins page ("watchdog") so its log is visible; the
   sidebar shows the last one for 24h. `CADDYMIUM_WATCHDOG=false` turns it off.
+- 2026-11-05 · Recommended protections are a registry (`suggestions.rs`). On an install that already has sites, a
+  recommendation it has not seen is pinned off in the stored defaults and offered on the Security page instead.
+  Installs that got 0.6.0's bot blocking, privacy and CrowdSec defaults without ever saving the Security page get
+  their sites back as before 0.6.0 (with the three as suggestions); a saved Security page is kept as chosen.
+- 2026-11-05 · Applying a suggestion edits the model like any other change: it goes live through Review & apply.

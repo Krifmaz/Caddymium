@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 struct TestServer {
     base: String,
     _dir: tempfile::TempDir,
+    store: Arc<Store>,
 }
 
 async fn start() -> TestServer {
@@ -16,6 +17,7 @@ async fn start() -> TestServer {
         ))
         .unwrap(),
     );
+    let store_handle = store.clone();
     let runner = Arc::new(Runner::new(""));
     let admin = Arc::new(Admin::new("127.0.0.1:1"));
     let caps = Arc::new(RwLock::new(Capabilities::default()));
@@ -78,7 +80,11 @@ async fn start() -> TestServer {
         .await
         .unwrap();
     });
-    TestServer { base, _dir: dir }
+    TestServer {
+        base,
+        _dir: dir,
+        store: store_handle,
+    }
 }
 
 struct TestClient {
@@ -778,4 +784,65 @@ async fn sso_sign_in_flow() {
         .await
         .unwrap();
     assert_eq!(r.status().as_u16(), 302, "signed out everywhere");
+}
+
+#[tokio::test]
+async fn security_suggestions_card() {
+    let ts = start().await;
+    let mut admin = TestClient::new(&ts.base);
+    admin
+        .call(
+            "POST",
+            "/api/setup",
+            Some(json!({"username": "admin", "password": "long enough password"})),
+        )
+        .await;
+    let site = json!({"name": "app", "hosts": ["app.example.com"], "kind": "proxy", "enabled": true,
+        "config": {"proxy": {"upstreams": ["localhost:8080"]}}});
+    let (code, out) = admin.call("POST", "/api/sites", Some(site)).await;
+    assert_eq!(code, 201, "{out}");
+    let id = out["id"].as_i64().unwrap();
+    // What the next start does on an install that already has sites.
+    crate::suggestions::settle(&ts.store).unwrap();
+
+    let (code, sec) = admin.call("GET", "/api/security", None).await;
+    assert_eq!(code, 200);
+    assert_eq!(sec["security"]["defaults"]["bots"], json!(false));
+    let ids: Vec<&str> = sec["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["bots", "privacy", "crowdsec"]);
+    assert_eq!(sec["suggestions"][0]["sites"][0]["name"], json!("app"));
+
+    let (code, out) = admin
+        .call(
+            "POST",
+            "/api/security/suggestions/bots/apply",
+            Some(json!({"site_id": id})),
+        )
+        .await;
+    assert_eq!(code, 200, "{out}");
+    assert_eq!(out["sites"][0]["effective"]["bots"], json!(true));
+    let (code, out) = admin
+        .call("POST", "/api/security/suggestions/privacy/apply", None)
+        .await;
+    assert_eq!(code, 200, "{out}");
+    assert_eq!(out["security"]["defaults"]["privacy"], json!(true));
+    let (code, out) = admin
+        .call("POST", "/api/security/suggestions/crowdsec/dismiss", None)
+        .await;
+    assert_eq!(code, 200, "{out}");
+    assert_eq!(out["suggestions"], json!([]));
+    assert_eq!(
+        out["pending_changes"],
+        json!(true),
+        "goes through Review & apply"
+    );
+    let (code, _) = admin
+        .call("POST", "/api/security/suggestions/nope/apply", None)
+        .await;
+    assert_eq!(code, 400);
 }

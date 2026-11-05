@@ -147,7 +147,44 @@ async fn page_data(st: &AppState) -> Result<Value, ApiError> {
         "users": users,
         "visitors": visitors(&st.log_dir),
         "pending_changes": st.pipeline.pending(),
+        "suggestions": crate::suggestions::list(&st.store),
     }))
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct SuggestionIn {
+    /// Apply to this site only; none = to every site.
+    site_id: Option<i64>,
+}
+
+/// Applies a suggested protection to every site or to one site.
+pub async fn apply_suggestion(
+    State(st): State<Arc<AppState>>,
+    Extension(p): Extension<Principal>,
+    c: Client,
+    Path(id): Path<String>,
+    OptJson(body): OptJson<SuggestionIn>,
+) -> ApiResult {
+    crate::suggestions::apply(&st.store, &id, body.site_id).map_err(bad)?;
+    let target = body
+        .site_id
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "all sites".into());
+    st.audit(Some(&p), &c, "security.suggestion", &id, &target);
+    ok(&page_data(&st).await?)
+}
+
+/// Hides a suggestion.
+pub async fn dismiss_suggestion(
+    State(st): State<Arc<AppState>>,
+    Extension(p): Extension<Principal>,
+    c: Client,
+    Path(id): Path<String>,
+) -> ApiResult {
+    crate::suggestions::dismiss(&st.store, &id).map_err(bad)?;
+    st.audit(Some(&p), &c, "security.suggestion_dismissed", &id, "");
+    ok(&page_data(&st).await?)
 }
 
 #[derive(Deserialize, Default)]

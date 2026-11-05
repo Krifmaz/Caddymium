@@ -24,6 +24,7 @@ mod secrets;
 mod server;
 mod shields;
 mod store;
+mod suggestions;
 mod supervisor;
 mod updates;
 mod watchdog;
@@ -83,6 +84,11 @@ async fn run(cfg: config::Config) -> Result<()> {
     );
 
     initial_admin(&cfg, &store)?;
+    // Before anything is generated: new recommended protections never switch
+    // on for existing sites through an update.
+    if let Err(e) = suggestions::settle(&store) {
+        tracing::warn!(err = %e, "could not check the Security defaults");
+    }
 
     let runner = Arc::new(caddy::Runner::new(&cfg.caddy_bin));
     let admin = Arc::new(caddy::Admin::new(&cfg.caddy_admin));
