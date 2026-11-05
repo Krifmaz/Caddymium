@@ -9,6 +9,7 @@ pub mod kit;
 pub mod login;
 pub mod notifications;
 pub mod plugins;
+pub mod settings;
 pub mod snippets;
 pub mod users;
 
@@ -24,6 +25,7 @@ pub fn page(route: &Route) -> AnyView {
         "domains" => view! { <domains::Domains/> }.into_any(),
         "ddns" => view! { <ddns::Ddns/> }.into_any(),
         "plugins" => view! { <plugins::Plugins/> }.into_any(),
+        "settings" => view! { <settings::Settings/> }.into_any(),
         "audit" => view! { <audit::Audit/> }.into_any(),
         "changes" => view! { <deploy::Changes/> }.into_any(),
         "history" => view! { <deploy::History/> }.into_any(),

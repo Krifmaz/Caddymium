@@ -10,7 +10,7 @@ mod imports;
 mod netscan;
 mod ops;
 mod plugin_handlers;
-mod resources;
+pub(crate) mod resources;
 mod security_handlers;
 mod sso;
 

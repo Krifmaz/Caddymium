@@ -133,6 +133,18 @@ impl Host for KitState {
     }
 }
 
+impl kit_server_settings::SettingsHost for KitState {
+    fn settings(&self) -> &dyn kit_server_settings::Values {
+        &*self.0
+    }
+
+    /// Settings changes go to the audit log ("admin updated settings: acme_email").
+    fn log(&self, message: &str) {
+        let (user, what) = message.split_once(' ').unwrap_or(("", message));
+        self.0.store.audit(user, "settings.update", "", what, "");
+    }
+}
+
 impl ChangelogHost for KitState {
     fn changelog(&self) -> &Changelog {
         &self.kit().changelog
@@ -277,6 +289,9 @@ pub fn router<S: Clone + Send + Sync + 'static>(st: Arc<AppState>) -> Router<S> 
         .merge(kit_server_bugreports::router())
         .merge(kit_server_bugreports::crash::router())
         .merge(kit_server_diagnostics::router())
+        .merge(kit_server_settings::router_with(
+            crate::settings_form::paths(),
+        ))
         .with_state(ks)
 }
 

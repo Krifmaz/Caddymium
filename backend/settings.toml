@@ -1,0 +1,239 @@
+# The Settings pages: Caddy's global options as one flat table (kit-server-settings). build.rs turns this file
+# into settings_gen.rs; src/settings_form.rs maps each key onto the panel's settings document (model::Settings),
+# so the Caddyfile generator, backups and the other pages keep reading the same values.
+#
+# [sections.<id>]  a page (tab) under Settings: title.
+# [groups.<id>]    a card on a page: section, title, desc.
+# [keys.<name>]    one setting: default (its TOML type is the setting's type), secret, group, label, help, type,
+#                  options, when (a select's key=value), unit, min, max, step, full, advanced.
+# No key names an environment variable: these settings live in the panel's database only.
+
+[sections.certs]
+title = "Domains & certificates"
+
+[sections.network]
+title = "Proxies & DNS"
+
+[sections.logs]
+title = "Logs & metrics"
+
+[sections.advanced]
+title = "Advanced"
+
+[groups.new_sites]
+section = "certs"
+title = "New sites"
+desc = "What a new site starts with."
+
+[groups.acme]
+section = "certs"
+title = "Certificates"
+desc = "Who issues your HTTPS certificates, and when to warn you before they expire."
+
+[groups.dns_check]
+section = "network"
+title = "DNS propagation check"
+desc = "Used with DNS validation to confirm records are visible. Pick public resolvers if your network has local DNS overrides for your domains."
+
+[groups.scan]
+section = "network"
+title = "Find app ranges"
+desc = "Networks the “Find app” button scans, besides Docker. The network of the address you open Caddymium at (e.g. 10.0.1.5 → 10.0.1.0/24) is always included."
+
+[groups.proxies]
+section = "network"
+title = "Behind a CDN or another proxy?"
+desc = "Trust these proxies so logs and IP rules see the real visitor IP. Leave off unless traffic actually comes through them."
+
+[groups.logs]
+section = "logs"
+title = "Logs & metrics"
+desc = "Access logs and Prometheus metrics for your sites."
+
+[groups.panel]
+section = "advanced"
+title = "Panel"
+desc = "Safety mode, sign-in time and where Caddymium itself is served. CrowdSec, bot blocking, login walls and home-only access are on the Security page."
+
+[groups.global]
+section = "advanced"
+title = "Extra global options"
+desc = "Text placed inside the Caddyfile's global { } block. Caddy checks it before every apply."
+
+# ---- certs
+
+[keys.default_domain]
+default = ""
+group = "new_sites"
+label = "Default domain for new sites"
+help = "New sites start as name.<this domain>; you only type the name. Empty: the first domain from Domains & DNS or your sites."
+
+[keys.acme_email]
+default = ""
+group = "acme"
+label = "Email for certificate notices"
+
+[keys.acme_ca]
+default = "letsencrypt"
+group = "acme"
+type = "select"
+label = "Certificate authority"
+options = [
+  ["letsencrypt", "Let's Encrypt (default)"],
+  ["letsencrypt_staging", "Let's Encrypt staging (testing)"],
+  ["zerossl", "ZeroSSL"],
+  ["google", "Google Trust Services"],
+  ["google_staging", "Google staging (testing)"],
+  ["caddy_internal", "Caddy's internal CA (self-signed)"],
+  ["custom", "Custom ACME server"],
+]
+
+[keys.acme_ca_url]
+default = ""
+group = "acme"
+type = "url"
+label = "ACME directory URL"
+help = "For example https://ca.internal/acme/directory"
+when = "acme_ca=custom"
+
+[keys.acme_ca_root]
+default = ""
+group = "acme"
+type = "path"
+label = "CA root certificate (PEM path, optional)"
+when = "acme_ca=custom"
+
+[keys.acme_eab_key_id]
+default = ""
+group = "acme"
+label = "EAB key ID"
+help = "External account binding, if your CA requires it (ZeroSSL, Google, some custom CAs)."
+advanced = true
+
+[keys.acme_eab_mac]
+default = ""
+secret = true
+group = "acme"
+label = "EAB HMAC key"
+advanced = true
+
+[keys.cert_alert_days]
+default = "14, 7"
+group = "acme"
+label = "Warn me when a certificate expires within (days)"
+help = "Days, separated by commas."
+
+# ---- network
+
+[keys.resolver_preset]
+default = "quad9"
+group = "dns_check"
+type = "select"
+label = "Resolvers"
+options = [
+  ["quad9", "Quad9"],
+  ["cloudflare", "Cloudflare"],
+  ["google", "Google"],
+  ["system", "System default"],
+  ["custom", "Custom"],
+]
+
+[keys.resolvers]
+default = ""
+group = "dns_check"
+type = "textarea"
+label = "Custom resolvers"
+help = "One per line, for example 9.9.9.9"
+when = "resolver_preset=custom"
+
+[keys.propagation_delay]
+default = ""
+group = "dns_check"
+label = "Propagation delay"
+help = "For example 30s (optional)."
+
+[keys.propagation_timeout]
+default = ""
+group = "dns_check"
+label = "Propagation timeout"
+help = "For example 5m (optional)."
+
+[keys.scan_ranges]
+default = ""
+group = "scan"
+type = "textarea"
+label = "Extra ranges"
+help = "One per line, for example 10.0.2.0/24"
+
+[keys.trusted_proxies]
+default = false
+group = "proxies"
+label = "Trust proxy headers"
+
+[keys.trusted_proxy_presets]
+default = ""
+group = "proxies"
+type = "checks"
+label = "Trusted proxies"
+options = [
+  ["cloudflare", "Cloudflare"],
+  ["fastly", "Fastly"],
+  ["private", "Private networks (LAN, Docker)"],
+]
+
+[keys.trusted_proxy_ranges]
+default = ""
+group = "proxies"
+type = "textarea"
+label = "Other ranges"
+help = "One per line, for example 203.0.113.0/24"
+
+# ---- logs
+
+[keys.default_access_log]
+default = true
+group = "logs"
+label = "Write access logs for every site (can be changed per site)"
+
+[keys.log_roll_size]
+default = "10MiB"
+group = "logs"
+label = "Rotate log files at"
+
+[keys.log_roll_keep]
+default = 5
+group = "logs"
+label = "Keep rotated files"
+min = 0
+
+[keys.metrics]
+default = true
+group = "logs"
+label = "Enable Prometheus metrics (per site)"
+
+# ---- advanced
+
+[keys.dry_run]
+default = false
+group = "panel"
+label = "Safety mode: every apply is a dry run (validate only)"
+
+[keys.session_timeout_minutes]
+default = 60
+group = "panel"
+label = "Sign out after inactivity"
+unit = "minutes"
+min = 1
+
+[keys.panel_domain]
+default = ""
+group = "panel"
+label = "Serve Caddymium itself at"
+help = "Optional, for example caddymium.example.com: Caddy proxies this hostname to the panel with HTTPS."
+
+[keys.raw_global]
+default = ""
+group = "global"
+type = "textarea"
+label = "Global options"
+full = true
