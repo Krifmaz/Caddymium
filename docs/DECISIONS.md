@@ -61,3 +61,5 @@ Non-obvious calls, one line each, newest last.
   public_url `/`, the backend serves it at `/` (hashed files cached for good, index.html no-cache, unknown non-/api
   paths get index.html) and the Svelte UI (frontend/) is gone, so nothing in the build needs Node. `/next` and
   `/next/*` answer a permanent redirect to `/`; the browser keeps the hash, so `/next/#/sites` lands on `/#/sites`.
+- 2026-11-05 · Merged branches are deleted by `cleanup-branches.yml`, a copy of the kit's: the tools that merge here
+  cannot delete refs. It keeps any branch with an open PR or with commits after its merge.
