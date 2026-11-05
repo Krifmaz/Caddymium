@@ -1,0 +1,6 @@
+[build]
+target = "index.html"
+# embedded into the panel's binary (backend/src/web.rs) and served at /next/ until it replaces the classic UI
+dist = "../backend/ui/next"
+public_url = "/next/"
+filehash = true

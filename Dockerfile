@@ -15,6 +15,16 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN mkdir -p ../backend/ui && npm run build
 
+# The web app on the Krifmaz kit (Leptos → WebAssembly), served at /next/.
+FROM --platform=$BUILDPLATFORM rust:1-bookworm AS web
+ARG TRUNK=0.22.1
+RUN rustup target add wasm32-unknown-unknown \
+    && curl -fsSL "https://github.com/trunk-rs/trunk/releases/download/v$TRUNK/trunk-x86_64-unknown-linux-gnu.tar.gz" \
+       | tar -xz -C /usr/local/bin trunk
+WORKDIR /src/web
+COPY web/ ./
+RUN mkdir -p ../backend/ui && trunk build --release --locked
+
 FROM --platform=$BUILDPLATFORM rust:1-bookworm AS build
 ARG VERSION=dev
 ARG TARGETARCH
@@ -34,6 +44,7 @@ RUN mkdir -p src ui/dist && echo 'fn main() {}' > src/main.rs \
 COPY backend/ ./
 COPY docs/releases /src/docs/releases
 COPY --from=ui /src/backend/ui/dist ./ui/dist
+COPY --from=web /src/backend/ui/next ./ui/next
 RUN CADDYMIUM_VERSION="$VERSION" cargo zigbuild --release --locked --target "$(cat /target)" \
     && cp "target/$(cat /target)/release/caddymium" /caddymium
 

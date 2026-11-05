@@ -148,6 +148,7 @@
             {st.watchdog.ok ? 'Caddy restarted by watchdog' : 'Watchdog could not restart Caddy'} at {wdTime(st.watchdog.at)}
           </a>
         {/if}
+        <a class="next-ui xs" href="/next/">Try the new look</a>
         <div class="me">
           <a href="#/account" class="me-link" class:active={page === 'account'} onclick={() => (menuOpen = false)}>
             <span class="avatar me-av">{app.me.user.username[0]?.toUpperCase()}</span>
@@ -259,6 +260,8 @@
   }
   .search:hover { border-color: var(--border-strong); color: var(--text-2); }
 
+  .next-ui { display: block; padding: 2px 10px; color: var(--muted); }
+  .next-ui:hover { color: var(--text); text-decoration: underline; }
   .watchdog { display: block; padding: 2px 10px 6px; color: var(--warn-soft-text, var(--muted)); text-decoration: none; }
   .watchdog.err { color: var(--err, #ef4444); }
   .watchdog:hover { text-decoration: underline; }

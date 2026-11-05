@@ -86,6 +86,33 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  web:
+    name: Web app (kit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: web
+      - name: Format
+        working-directory: web
+        run: cargo fmt --check
+      - name: Clippy
+        working-directory: web
+        run: cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
+      - name: Test
+        working-directory: web
+        run: cargo test --locked
+      - name: Build
+        working-directory: web
+        run: |
+          curl -fsSL "https://github.com/trunk-rs/trunk/releases/download/v0.22.1/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C /usr/local/bin trunk
+          trunk build --release --locked
+
   docker:
     name: Docker images
     if: github.event_name != 'push'

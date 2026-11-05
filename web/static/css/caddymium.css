@@ -1,0 +1,37 @@
+/* Caddymium's own rules on top of the kit's (tokens.css, kit.css, app.css): the sidebar's Caddy line, the
+   "unapplied changes" bar, the phone header and a few page parts. Colours come from the kit's tokens only. */
+.page-head { margin-bottom: 18px; gap: 12px; }
+.page-head h1 { margin: 0; }
+.nav a > span:first-child { display: inline-grid; }
+.nav a svg { width: 17px; height: 17px; }
+.avatar { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 700;
+  background: var(--grad); color: var(--on-accent); }
+.me-link { min-width: 0; padding: 4px; border-radius: 10px; }
+.me-link:hover { background: var(--panel-2); }
+.caddy-status { padding: 8px 10px; border-top: 1px solid var(--border); }
+.caddy-status .row { gap: 8px; }
+.watchdog { display: block; margin-top: 4px; color: var(--warn); }
+.watchdog.err { color: var(--err); }
+.watchdog:hover { text-decoration: underline; }
+.btn.danger { border-color: rgba(239,68,68,.45); color: var(--err); }
+.btn.danger:hover { background: rgba(239,68,68,.12); border-color: var(--err); }
+.qr { width: 212px; height: 212px; padding: 6px; border-radius: 8px; background: #fff; }
+.qr svg { width: 200px; height: 200px; display: block; }
+.pending-bar { position: fixed; bottom: 22px; left: calc(50% + var(--sidebar) / 2); transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 12px; padding: 7px 7px 7px 16px; border-radius: 999px; white-space: nowrap;
+  background: var(--panel-2); border: 1px solid var(--border); box-shadow: var(--shadow); font-weight: 550; }
+.pending-bar .go { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  background: var(--grad); color: var(--on-accent); font-weight: 650; }
+.pending-bar .go span { display: inline-grid; }
+.pending-bar .go svg { width: 15px; height: 15px; }
+.mobile-top { display: none; }
+.scrim { display: none; }
+@media (max-width: 900px) {
+  .mobile-top { display: flex; align-items: center; gap: 8px; margin: -8px -8px 12px; }
+  .mobile-top svg { width: 20px; height: 20px; }
+  .scrim:not(.hidden) { display: block; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); }
+  .pending-bar { left: 50%; bottom: 16px; }
+}
+@media (max-width: 420px) {
+  .pending-bar .pending-text { display: none; }
+}

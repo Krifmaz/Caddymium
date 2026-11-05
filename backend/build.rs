@@ -6,11 +6,13 @@
 
 fn main() {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let dist = std::path::Path::new(&manifest).join("ui").join("dist");
-    if let Err(e) = std::fs::create_dir_all(&dist) {
-        println!("cargo:warning=could not create {}: {e}", dist.display());
+    for ui in ["dist", "next"] {
+        let dir = std::path::Path::new(&manifest).join("ui").join(ui);
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            println!("cargo:warning=could not create {}: {e}", dir.display());
+        }
+        println!("cargo:rerun-if-changed=ui/{ui}");
     }
-    println!("cargo:rerun-if-changed=ui/dist");
     let notes = std::path::Path::new(&manifest).join("../docs/releases");
     kit_server_changelog::build::embed(&notes, "changelog_gen.rs");
 }
