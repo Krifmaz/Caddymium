@@ -7,13 +7,17 @@ use kit_leptos::details::CopyButton;
 use leptos::prelude::*;
 use serde_json::Value;
 
-/// An error box: the whole sentence, selectable, with Copy.
+/// An error box: what happened (`title`, optional) and the whole sentence, selectable, with Copy.
 #[component]
-pub fn ErrorBox(#[prop(into)] message: String) -> impl IntoView {
+pub fn ErrorBox(#[prop(into)] message: String, #[prop(optional, into)] title: String) -> impl IntoView {
+    let copy = if title.is_empty() { message.clone() } else { format!("{title}\n{message}") };
     view! {
         <div class="error-box row" role="alert" style="align-items:flex-start">
-            <span class="grow" style="white-space:pre-wrap;user-select:text">{message.clone()}</span>
-            <CopyButton text=message/>
+            <div class="grow" style="white-space:pre-wrap;user-select:text">
+                {(!title.is_empty()).then(|| view! { <strong style="display:block">{title.clone()}</strong> })}
+                {message}
+            </div>
+            <CopyButton text=copy/>
         </div>
     }
 }

@@ -88,3 +88,16 @@ pre.code-block { margin: 0; padding: 14px 16px; background: var(--bg-2); border:
 pre.peek { max-height: 140px; overflow: hidden; margin: 0; }
 button.card.item { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 8px; width: 100%; }
 button.card.item:hover { border-color: var(--accent); }
+fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
+/* plugins */
+.chip { font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; }
+.chip.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.prow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.prow.queued { border-color: var(--accent); background: rgba(var(--accent-rgb), .08); }
+tr.off td { opacity: .5; text-decoration: line-through; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.right { text-align: right; white-space: nowrap; }
+.warn-text { color: var(--warn); }
+.job-running { border-color: var(--accent); }
+.actionbar { position: sticky; bottom: 16px; z-index: 5; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 18px;
+  padding: 10px 10px 10px 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
