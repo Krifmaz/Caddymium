@@ -83,6 +83,21 @@ impl Checker {
         self.store.kv_get_json(STATE_KEY).unwrap_or_default()
     }
 
+    /// The state, after dropping a failed update that a later install (say,
+    /// Update Caddy on the Plugins page) or the running version made moot.
+    pub fn state_settled(&self) -> UpdateState {
+        let mut st = self.state();
+        let caps = self.caps();
+        if caps.detected && !caps.version_s.is_empty() {
+            st.running = caps.version_s.clone();
+            st.update_available = is_newer(&st.latest, &caps.version);
+        }
+        if settle(&mut st) {
+            self.save(&st);
+        }
+        st
+    }
+
     fn save(&self, st: &UpdateState) {
         if let Err(e) = self.store.kv_set_json(STATE_KEY, st) {
             tracing::warn!(err = %e, "could not save the update state");
@@ -125,13 +140,14 @@ impl Checker {
             );
             st.notified_for = st.latest.clone();
         }
+        settle(&mut st);
         self.save(&st);
         st
     }
 
     pub fn report(&self) -> Report {
         let s = self.settings();
-        let st = self.state();
+        let st = self.state_settled();
         let next_check = s.check.then(|| {
             st.last_check
                 .map(|t| t + chrono::Duration::hours(s.interval_hours()))
@@ -287,6 +303,38 @@ impl Checker {
     }
 }
 
+/// True when a failed automatic update no longer matters: the running
+/// version already is (or is past) the one that failed, or already the
+/// latest release. Its banner is then cleared.
+pub fn failure_is_stale(a: &AutoResult, running: &str, latest: &str) -> bool {
+    if a.ok {
+        return false;
+    }
+    let run = registry::parse_version(running);
+    if !run.valid {
+        return false;
+    }
+    let reached = |v: &str| {
+        let v = registry::parse_version(v);
+        v.valid && run.compare(&v) != Ordering::Less
+    };
+    reached(&a.to) || reached(latest)
+}
+
+/// Drops a failed automatic update that no longer matters (see
+/// [`failure_is_stale`]); true when it did.
+fn settle(st: &mut UpdateState) -> bool {
+    if st
+        .last_auto
+        .as_ref()
+        .is_some_and(|a| failure_is_stale(a, &st.running, &st.latest))
+    {
+        st.last_auto = None;
+        return true;
+    }
+    false
+}
+
 fn is_newer(latest: &str, running: &registry::version::Version) -> bool {
     let l = registry::parse_version(latest);
     l.valid && running.valid && l.compare(running) == Ordering::Greater
@@ -350,6 +398,46 @@ mod tests {
         assert!(!is_newer("v2.11.5", &running));
         assert!(!is_newer("", &running));
         assert!(!is_newer("v2.11.7", &registry::parse_version("(devel)")));
+    }
+
+    fn failed(to: &str) -> AutoResult {
+        AutoResult {
+            to: to.into(),
+            ok: false,
+            error: "boom".into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_failed_update_is_cleared_once_moot() {
+        // Still running the old version, newer release still out: keep it.
+        assert!(!failure_is_stale(&failed("v2.11.0"), "v2.10.2", "v2.11.0"));
+        // A later (manual) update got there or past it.
+        assert!(failure_is_stale(&failed("v2.11.0"), "v2.11.0", "v2.11.0"));
+        assert!(failure_is_stale(&failed("v2.11.0"), "v2.11.1", "v2.11.1"));
+        // The running version is already the latest (the release was pulled).
+        assert!(failure_is_stale(&failed("v2.11.0"), "v2.10.2", "v2.10.2"));
+        // Successes and unknown versions are left alone.
+        assert!(!failure_is_stale(
+            &AutoResult {
+                ok: true,
+                ..failed("v2.11.0")
+            },
+            "v2.11.0",
+            "v2.11.0"
+        ));
+        assert!(!failure_is_stale(&failed("v2.11.0"), "", "v2.11.0"));
+
+        let mut st = UpdateState {
+            running: "v2.11.0".into(),
+            latest: "v2.11.0".into(),
+            last_auto: Some(failed("v2.11.0")),
+            ..Default::default()
+        };
+        assert!(settle(&mut st));
+        assert!(st.last_auto.is_none());
+        assert!(!settle(&mut st));
     }
 
     #[test]

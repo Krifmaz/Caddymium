@@ -255,13 +255,24 @@ impl Manager {
     // ---------------------------------------------------------------- status
 
     pub async fn status(&self) -> Status {
-        let st = self.state();
+        let mut st = self.state();
         // Cached only: the page never waits on GitHub (chores_loop refreshes).
         let latest = self
             .store
             .kv_get_json::<Latest>(LATEST_KEY)
             .map(|l| l.version)
             .unwrap_or_default();
+        // A failed automatic update that a later install made moot is cleared.
+        if st
+            .last_auto
+            .as_ref()
+            .is_some_and(|a| crate::updates::failure_is_stale(a, &st.installed_version, &latest))
+        {
+            st.last_auto = None;
+            let mut fresh = self.state();
+            fresh.last_auto = None;
+            self.save_state(&fresh);
+        }
         let (supported, reason) = match self.supported() {
             Ok(()) => (true, String::new()),
             Err(e) => (false, e),
