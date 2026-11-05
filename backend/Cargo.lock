@@ -573,7 +573,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1151,7 +1151,7 @@ dependencies = [
 [[package]]
 name = "kit-rules"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "serde",
  "serde_json",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "kit-server-bugreports"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "image",
@@ -1176,7 +1176,7 @@ dependencies = [
 [[package]]
 name = "kit-server-changelog"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "kit-rules",
@@ -1188,7 +1188,7 @@ dependencies = [
 [[package]]
 name = "kit-server-core"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "async-trait",
  "axum",
@@ -1201,7 +1201,7 @@ dependencies = [
 [[package]]
 name = "kit-server-diagnostics"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "futures-util",
@@ -1214,7 +1214,7 @@ dependencies = [
 [[package]]
 name = "kit-server-health"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "serde_json",
@@ -1223,7 +1223,7 @@ dependencies = [
 [[package]]
 name = "kit-server-notices"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "futures-util",
@@ -1237,7 +1237,7 @@ dependencies = [
 [[package]]
 name = "kit-server-settings"
 version = "0.1.0"
-source = "git+https://github.com/Krifmaz/kit?tag=v0.2.1#e2ce353683c05d515df64da086d5c38a24adc781"
+source = "git+https://github.com/Krifmaz/kit?tag=v0.5.1#09500df2d4581a027d94d2e60ababf19aab4bd20"
 dependencies = [
  "axum",
  "kit-server-core",
@@ -1780,7 +1780,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1837,7 +1837,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2181,7 +2181,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2644,7 +2644,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

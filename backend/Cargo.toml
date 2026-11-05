@@ -49,17 +49,17 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 url = "2"
 # Krifmaz/kit, pinned to one release tag. To update: read the kit's CHANGELOG.md, bump the tag on every line,
 # run the tests.
-kit-server-core = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", features = ["sqlite"] }
-kit-server-health = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
-kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
-kit-server-notices = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
-kit-server-bugreports = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
-kit-server-diagnostics = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
-kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-core = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1", features = ["sqlite"] }
+kit-server-health = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
+kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
+kit-server-notices = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
+kit-server-bugreports = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
+kit-server-diagnostics = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
+kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1" }
 
 [build-dependencies]
-kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", default-features = false }
-kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", default-features = false, features = ["toml"] }
+kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1", default-features = false }
+kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.5.1", default-features = false, features = ["toml"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -14,6 +14,7 @@ mod app;
 mod form;
 mod icons;
 mod pages;
+mod palette;
 mod sites;
 mod ui;
 
@@ -107,6 +108,7 @@ async fn boot() {
         return;
     }
     leptos::mount::mount_to(root, Shell).forget();
+    palette::install();
     // the notice slot is part of the shell: start once it is drawn
     notice::start(notice::NoticeSource::default(), app::is_admin());
     notice::mount();
@@ -224,6 +226,9 @@ fn Shell() -> impl IntoView {
         <div class="shell">
             <aside class="sidebar" id="sidebar" class:open=move || menu.get()>
                 <a class="brand" href="#/sites"><img src="favicon.svg" alt=""/>{APP}</a>
+                <button class="search-btn" id="search-btn" on:click=move |_| { menu.set(false); kit_leptos::palette::open(); }>
+                    <span inner_html=icons::icon("search")></span><span class="grow">"Search"</span><kbd>"Ctrl K"</kbd>
+                </button>
                 <nav class="nav">{groups}</nav>
                 <ui::CaddyStatus/>
                 <div class="sidebar-foot">
@@ -243,7 +248,8 @@ fn Shell() -> impl IntoView {
                 <header class="mobile-top">
                     <button class="btn ghost icon" aria-label="Menu" on:click=move |_| menu.set(true) inner_html=icons::icon("menu")></button>
                     <img src="favicon.svg" alt="" width="24" height="24"/>
-                    <strong>{APP}</strong>
+                    <strong class="grow">{APP}</strong>
+                    <button class="btn ghost icon" aria-label="Search" on:click=move |_| kit_leptos::palette::open() inner_html=icons::icon("search")></button>
                 </header>
                 <div id="server-notice"></div>
                 <div id="view">{page}</div>
