@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
   import { app, toast, toastErr, refreshStatus, loadMeta, can } from '../lib/state.svelte.js'
@@ -214,7 +215,7 @@
     {/if}
   </fieldset>
 
-  {#if error}<div class="alert err" style="margin-top:14px">{error}</div>{/if}
+  {#if error}<ErrorBox message={error} />{/if}
   {#if can.admin()}
     <div class="row" style="margin-top:14px"><button class="btn primary" onclick={save} disabled={busy}>Save settings</button></div>
   {/if}

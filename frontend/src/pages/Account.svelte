@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import QRCode from 'qrcode'
   import { api } from '../lib/api.js'
   import { app, toast } from '../lib/state.svelte.js'
@@ -60,7 +61,7 @@
     <label class="field"><span>Current password</span><input type="password" bind:value={current} autocomplete="current-password" required /></label>
     <label class="field"><span>New password</span><input type="password" bind:value={next} autocomplete="new-password" required minlength="10" /></label>
     <label class="field"><span>Repeat new password</span><input type="password" bind:value={next2} autocomplete="new-password" required /></label>
-    {#if pwErr}<div class="alert err">{pwErr}</div>{/if}
+    {#if pwErr}<ErrorBox message={pwErr} />{/if}
     <div><button class="btn primary" type="submit">Change password</button></div>
   </form>
 
@@ -78,7 +79,7 @@
       <p class="muted">Protect your account with a code from your phone in addition to your password.</p>
       <div><button class="btn" onclick={begin}>Set up two-factor</button></div>
     {/if}
-    {#if tfErr}<div class="alert err">{tfErr}</div>{/if}
+    {#if tfErr}<ErrorBox message={tfErr} />{/if}
   </div>
 </div>
 

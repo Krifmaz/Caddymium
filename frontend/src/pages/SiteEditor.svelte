@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount } from 'svelte'
   import {
     Radar, ArrowLeft, ArrowRight, CopyPlus, Trash2, Sparkles, Server, Folder, CornerUpRight, MessageSquare, Code, Activity,
@@ -582,7 +583,7 @@
 
   {#if can.edit()}
     <div class="actionbar">
-      {#if error}<div class="alert err grow"><CircleAlert /><span>{error}</span></div>{:else}<span class="muted small grow hide-sm">Saved changes go live after you review and apply.</span>{/if}
+      {#if error}<ErrorBox class="grow" message={error} />{:else}<span class="muted small grow hide-sm">Saved changes go live after you review and apply.</span>{/if}
       <button class="btn" onclick={() => save(false)} disabled={busy}>Save</button>
       <button class="btn primary" onclick={() => save(true)} disabled={busy}>Save & review <ArrowRight size={15} /></button>
     </div>

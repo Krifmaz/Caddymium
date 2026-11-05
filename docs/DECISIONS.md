@@ -27,3 +27,6 @@ Non-obvious calls, one line each, newest last.
   Installs that got 0.6.0's bot blocking, privacy and CrowdSec defaults without ever saving the Security page get
   their sites back as before 0.6.0 (with the three as suggestions); a saved Security page is kept as chosen.
 - 2026-11-05 · Applying a suggestion edits the model like any other change: it goes live through Review & apply.
+- 2026-11-05 · Copyable errors (goal 6) are built in the Svelte UI for now (error toasts stay until closed with Copy and
+  merge duplicates; every error box has Copy; server errors say what to do). The kit's web components are Leptos, so
+  they arrive with the kit adoption, which replaces these.

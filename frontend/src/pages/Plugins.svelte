@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount, onDestroy } from 'svelte'
   import { Puzzle, Search, Plus, Minus, Download, RefreshCw, Undo2, Trash2, CircleCheck, CircleX, TriangleAlert, Info, ChevronDown, ExternalLink } from '@lucide/svelte'
   import { api } from '../lib/api.js'
@@ -172,10 +173,11 @@
       </div>
       {#if upd?.last_auto}
         {@const a = upd.last_auto}
-        <div class="alert {a.ok ? 'ok' : 'err'}">
-          {#if a.ok}<CircleCheck />{:else}<CircleX />{/if}
-          <span>Automatic update {a.from ? `from ${a.from} ` : ''}to {a.to} {a.ok ? 'installed' : 'failed'} {when(a.at)}{#if !a.ok}: {a.error}{/if}</span>
-        </div>
+        {#if a.ok}
+          <div class="alert ok"><CircleCheck /><span>Automatic update {a.from ? `from ${a.from} ` : ''}to {a.to} installed {when(a.at)}</span></div>
+        {:else}
+          <ErrorBox title={`Automatic update ${a.from ? `from ${a.from} ` : ''}to ${a.to} failed ${when(a.at)}`} message={a.error} />
+        {/if}
       {/if}
       {#if us}
         <fieldset class="stack" disabled={!can.admin()}>
@@ -217,7 +219,7 @@
           </div>
           <button class="btn ghost sm" onclick={() => (showLog = !showLog)}><ChevronDown size={15} /> {showLog ? 'Hide' : 'Show'} log</button>
         </div>
-        {#if j.status === 'failed'}<div class="alert err"><CircleX /><span>{j.error}</span></div>{/if}
+        {#if j.status === 'failed'}<ErrorBox message={j.error} />{/if}
         {#if showLog}<pre class="log">{j.log.join('\n')}</pre>{/if}
       </div>
     {/if}

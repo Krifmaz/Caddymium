@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { onMount } from 'svelte'
   import { Signal, Plus, Trash2, RefreshCw, CircleCheck, CircleX, TriangleAlert, Info } from '@lucide/svelte'
   import { api } from '../lib/api.js'
@@ -164,7 +165,7 @@
 
     <div class="alert info small"><Info /><span>Dynamic DNS keeps your records correct; HTTPS certificates still come from the domain's validation settings. For a home connection, DNS validation under Domains &amp; DNS avoids opening port 80.</span></div>
 
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#if can.admin()}<div class="row"><button class="btn primary" onclick={save} disabled={busy}>Save</button></div>{/if}
   </div>
 {:else}

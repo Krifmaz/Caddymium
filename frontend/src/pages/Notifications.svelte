@@ -1,4 +1,5 @@
 <script>
+  import ErrorBox from '../lib/ErrorBox.svelte'
   import { Plus, Bell, Send } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import { api } from '../lib/api.js'
@@ -92,7 +93,7 @@
       </div>
     </div>
     <label class="check"><input type="checkbox" bind:checked={edit.enabled} /> Enabled</label>
-    {#if error}<div class="alert err">{error}</div>{/if}
+    {#if error}<ErrorBox message={error} />{/if}
     {#snippet footer()}
       {#if edit.id}<button class="btn danger" style="margin-right:auto" onclick={del}>Delete</button>{/if}
       <button class="btn" onclick={test} disabled={testing}><Send size={15} /> {testing ? 'Sending…' : 'Send test'}</button>
