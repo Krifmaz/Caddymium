@@ -57,3 +57,7 @@ Non-obvious calls, one line each, newest last.
   /api/settings/form* because /api/settings is the whole document. No key has an environment variable: these are
   panel data, not deployment config. Lists are one-per-line text fields; DDNS, updates and Security keep their
   own pages (rows and live status the schema can't describe).
+- 2026-11-05 · Cutover: the kit web app is the panel's only UI. trunk builds it into backend/ui/dist with
+  public_url `/`, the backend serves it at `/` (hashed files cached for good, index.html no-cache, unknown non-/api
+  paths get index.html) and the Svelte UI (frontend/) is gone, so nothing in the build needs Node. `/next` and
+  `/next/*` answer a permanent redirect to `/`; the browser keeps the hash, so `/next/#/sites` lands on `/#/sites`.

@@ -1,8 +1,6 @@
-**/node_modules
 backend/target
 backend/ui/dist
 .git
 .env
 data
 web/target
-backend/ui/next

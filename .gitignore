@@ -1,7 +1,5 @@
-node_modules/
 backend/target/
 backend/ui/dist/
-backend/ui/next/
 web/target/
 /data/
 .env

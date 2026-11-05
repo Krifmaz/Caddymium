@@ -279,7 +279,7 @@ pub fn router<S: Clone + Send + Sync + 'static>(st: Arc<AppState>) -> Router<S> 
     kit_server_notices::spawn_rechecks(ks.clone());
     let health = kit_server_health::Health::new(
         ks.0.version.trim_start_matches('v'),
-        crate::web::next_build(),
+        crate::web::web_build(),
     );
     Router::new()
         .merge(kit_server_health::router(health))

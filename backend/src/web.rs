@@ -1,29 +1,28 @@
-//! The built web UI, embedded into the binary. The UI is built into ui/dist
-//! (see frontend/vite.config.js); without a build the server still runs and
+//! The web app (web/, Leptos on the Krifmaz kit), built by trunk into ui/dist
+//! and embedded into the binary. Without a build the server still runs and
 //! shows a hint instead of the UI.
 
 use axum::body::Body;
 use axum::http::{StatusCode, Uri, header};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use rust_embed::Embed;
 
 #[derive(Embed)]
 #[folder = "ui/dist"]
 struct Ui;
 
-/// The web app on the Krifmaz kit (web/, built by trunk into ui/next), served
-/// at /next/ until it replaces the classic UI.
-#[derive(Embed)]
-#[folder = "ui/next"]
-struct Next;
+/// The script name's stem of the web app: `caddymium-web-<hash>.js`.
+const SCRIPT: &str = "caddymium-web-";
 
-/// The script name's stem of the kit web app: `caddymium-web-<hash>.js`.
-const NEXT_SCRIPT: &str = "caddymium-web-";
-
-/// The build of the kit web app (the hash in its script's name), for
+/// The build of the web app (the hash in its script's name), for
 /// `/api/health`: an open tab reloads when it changes.
-pub fn next_build() -> Option<String> {
-    Next::iter().find_map(|f| kit_server_health::web_build_of(&f, NEXT_SCRIPT).map(str::to_string))
+pub fn web_build() -> Option<String> {
+    Ui::iter().find_map(|f| kit_server_health::web_build_of(&f, SCRIPT).map(str::to_string))
+}
+
+/// Reports whether a UI build is embedded.
+pub fn available() -> bool {
+    Ui::get("index.html").is_some()
 }
 
 /// `caddymium-web-f92ab5b84b305a59_bg.wasm`, `app-6ecd585ddbbbd1c2.css`: a
@@ -38,55 +37,14 @@ fn hashed_asset(name: &str) -> bool {
             .is_some_and(|(_, h)| h.len() >= 12 && h.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// Serves the kit web app under /next/: its files (named by content, so
-/// cached for good), index.html for everything else.
-pub async fn next(uri: Uri) -> Response {
-    let p = uri
-        .path()
-        .trim_start_matches("/next")
-        .trim_start_matches('/');
-    if !p.is_empty() {
-        if let Some(f) = Next::get(p) {
-            let mime = mime_guess::from_path(p).first_or_octet_stream();
-            let cache = if hashed_asset(p) {
-                "public, max-age=31536000, immutable"
-            } else {
-                "no-cache"
-            };
-            return Response::builder()
-                .header(header::CONTENT_TYPE, mime.as_ref())
-                .header(header::CACHE_CONTROL, cache)
-                .body(Body::from(f.data.into_owned()))
-                .unwrap();
-        }
-    }
-    match Next::get("index.html") {
-        Some(f) => Response::builder()
-            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-            .header(header::CACHE_CONTROL, "no-cache")
-            .body(Body::from(f.data.into_owned()))
-            .unwrap(),
-        None => (
-            StatusCode::NOT_FOUND,
-            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-            "The new web app was not built into this binary.\nBuild it with: cd web && trunk build --release\n",
-        )
-            .into_response(),
-    }
-}
-
-/// Reports whether a UI build is embedded.
-pub fn available() -> bool {
-    Ui::get("index.html").is_some()
-}
-
-/// Serves the built UI, falling back to index.html for client routes.
+/// Serves the web app: its files (the hashed ones cached for good),
+/// index.html for everything else (its routes live in the URL's hash).
 pub async fn spa(uri: Uri) -> Response {
     let p = uri.path().trim_start_matches('/');
     if !p.is_empty() {
         if let Some(f) = Ui::get(p) {
             let mime = mime_guess::from_path(p).first_or_octet_stream();
-            let cache = if p.starts_with("assets/") {
+            let cache = if hashed_asset(p) {
                 "public, max-age=31536000, immutable"
             } else {
                 "no-cache"
@@ -107,10 +65,17 @@ pub async fn spa(uri: Uri) -> Response {
         None => (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-            "Caddymium API is running, but the web UI was not built into this binary.\nBuild it with: cd frontend && npm ci && npm run build\n",
+            "Caddymium API is running, but the web UI was not built into this binary.\nBuild it with: cd web && trunk build --release\n",
         )
             .into_response(),
     }
+}
+
+/// `/next/…`, where the web app lived while it replaced the classic UI: a
+/// permanent redirect to `/`. Browsers keep the hash (`/next/#/sites` →
+/// `/#/sites`), so old bookmarks land on the same page.
+pub async fn old_next() -> Redirect {
+    Redirect::permanent("/")
 }
 
 #[cfg(test)]

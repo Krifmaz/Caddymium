@@ -8,14 +8,7 @@
 # with cargo-zigbuild (zig as the C compiler/linker), so arm64 images don't
 # need emulation.
 
-FROM --platform=$BUILDPLATFORM node:24-alpine AS ui
-WORKDIR /src/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY frontend/ ./
-RUN mkdir -p ../backend/ui && npm run build
-
-# The web app on the Krifmaz kit (Leptos → WebAssembly), served at /next/.
+# The web app on the Krifmaz kit (Leptos → WebAssembly), served at /.
 FROM --platform=$BUILDPLATFORM rust:1-bookworm AS web
 ARG TRUNK=0.22.1
 RUN rustup target add wasm32-unknown-unknown \
@@ -43,8 +36,7 @@ RUN mkdir -p src ui/dist && echo 'fn main() {}' > src/main.rs \
     && rm -rf src target/*/release/deps/caddymium* target/*/release/caddymium*
 COPY backend/ ./
 COPY docs/releases /src/docs/releases
-COPY --from=ui /src/backend/ui/dist ./ui/dist
-COPY --from=web /src/backend/ui/next ./ui/next
+COPY --from=web /src/backend/ui/dist ./ui/dist
 RUN CADDYMIUM_VERSION="$VERSION" cargo zigbuild --release --locked --target "$(cat /target)" \
     && cp "target/$(cat /target)/release/caddymium" /caddymium
 
