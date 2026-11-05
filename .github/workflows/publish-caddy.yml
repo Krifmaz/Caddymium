@@ -9,7 +9,6 @@ name: Publish Caddy image
 on:
   push:
     branches: [main]
-    tags: ["v*"]
     paths:
       - "caddy/**"
       - ".github/workflows/publish-caddy.yml"

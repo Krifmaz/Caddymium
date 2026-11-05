@@ -1,9 +1,10 @@
-name: Publish panel image
+name: Release
 
-# Builds the panel image and pushes it to GitHub Container Registry:
-#   ghcr.io/<owner>/caddymium
-# Pushes to main publish :latest; version tags (v1.2.3) also publish :1.2.3
-# and get an entry on the Releases page that points at that image.
+# Every push to main ships a normal vX.Y.Z release through the kit's shared
+# workflows: the next version (PATCH by default; MINOR/MAJOR when the PR adds
+# docs/releases/<version>.md, which is then also the notes), the panel image
+#   ghcr.io/<owner>/caddymium:<version> and :latest
+# and the GitHub release that points at it.
 # amd64 only by default: arm64 is built under emulation and costs a lot of
 # Actions minutes, so request it explicitly with "Run workflow".
 # The Caddy image has its own workflow that only runs when caddy/ changes.
@@ -11,10 +12,6 @@ name: Publish panel image
 on:
   push:
     branches: [main]
-    tags: ["v*"]
-    paths-ignore:
-      - "caddy/**"
-      - "**.md"
   workflow_dispatch:
     inputs:
       platforms:
@@ -24,66 +21,37 @@ on:
         options: [linux/amd64, "linux/amd64,linux/arm64"]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
-  group: publish-panel-${{ github.ref }}
-  cancel-in-progress: true
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  image:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/caddymium
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=short
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ inputs.platforms || 'linux/amd64' }}
-          push: true
-          build-args: VERSION=${{ github.ref_name }}-${{ github.sha }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=caddymium
-          cache-to: type=gha,mode=max,scope=caddymium
+  prepare:
+    uses: Krifmaz/kit/.github/workflows/kit-release.yml@v0.2.0
+    with:
+      stage: prepare
+      app-name: Caddymium
 
-  release:
-    # A version tag also gets an entry on the Releases page, with generated
-    # notes and the image it corresponds to.
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-          IMAGE: ghcr.io/${{ github.repository_owner }}/caddymium
-        run: |
-          set -euo pipefail
-          image=${IMAGE,,}
-          v=${TAG#v}
-          {
-            printf 'Image: `%s:%s`\n\n' "$image" "$v"
-            printf '```yaml\nimage: %s:%s\n```\n\n' "$image" "$v"
-            gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" --jq .body
-          } > notes.md
-          gh release create "$TAG" --title "Caddymium $TAG" --notes-file notes.md
+  docker:
+    needs: prepare
+    uses: Krifmaz/kit/.github/workflows/kit-docker.yml@v0.2.0
+    with:
+      image: caddymium
+      version: ${{ needs.prepare.outputs.version }}
+      platforms: ${{ inputs.platforms || 'linux/amd64' }}
+      build-args: |
+        VERSION=v${{ needs.prepare.outputs.version }}
+
+  publish:
+    needs: [prepare, docker]
+    uses: Krifmaz/kit/.github/workflows/kit-release.yml@v0.2.0
+    with:
+      stage: publish
+      app-name: Caddymium
+      version: ${{ needs.prepare.outputs.version }}
+      notes: |
+        image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/caddymium"
+        { printf '\n## Image\n\n```yaml\nimage: %s:%s\n```\n' "$image" "$V"; } >> "$NOTES"
