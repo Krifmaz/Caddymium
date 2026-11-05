@@ -665,6 +665,85 @@ pub async fn get_settings(State(st): State<Arc<AppState>>) -> ApiResult {
     ok(&settings_view(&st))
 }
 
+/// Checks and tidies settings before they are saved (`PUT /settings` and the Settings pages): the reason when
+/// they can't be saved.
+pub fn check_settings(st: &AppState, s: &mut Settings) -> Result<(), String> {
+    if !s.acme_ca.is_empty()
+        && s.acme_ca != "custom"
+        && s.acme_ca != "caddy_internal"
+        && generator::ca_preset(&s.acme_ca).is_none()
+    {
+        return Err(String::from("unknown certificate authority"));
+    }
+    if !s.resolver_preset.is_empty() && s.resolver_preset != "custom" {
+        let Some(r) = generator::resolver_preset(&s.resolver_preset) else {
+            return Err(String::from("unknown resolver preset"));
+        };
+        s.resolvers = r.iter().map(|x| x.to_string()).collect();
+    }
+    if s.session_timeout_minutes <= 0 {
+        s.session_timeout_minutes = 60;
+    }
+    s.cert_alert_days.sort();
+    crate::shields::validate_security(&mut s.security).map_err(|e| format!("Security: {e}"))?;
+    if s.ddns.enabled {
+        if let Some(cid) = s.ddns.credential_id {
+            if st.store.credential(cid).is_err() {
+                return Err(String::from(
+                    "Dynamic DNS: that DNS provider account doesn't exist",
+                ));
+            }
+        }
+        for z in &mut s.ddns.domains {
+            z.zone = z.zone.trim().trim_end_matches('.').to_ascii_lowercase();
+            if !z.zone.is_empty() && !valid_host(&z.zone) {
+                return Err(format!("Dynamic DNS: {:?} is not a valid zone", z.zone));
+            }
+            z.names = z
+                .names
+                .iter()
+                .map(|n| n.trim().to_string())
+                .filter(|n| !n.is_empty())
+                .collect();
+        }
+        s.ddns.domains.retain(|z| !z.zone.is_empty());
+        for src in &s.ddns.ip_sources {
+            if !matches!(
+                src.kind.as_str(),
+                "upnp" | "simple_http" | "interface" | "static"
+            ) {
+                return Err(format!("Dynamic DNS: unknown IP source {:?}", src.kind));
+            }
+        }
+    }
+    {
+        let u = &mut s.updates;
+        if u.check_every_hours <= 0 {
+            u.check_every_hours = 6;
+        }
+        u.check_every_hours = u.interval_hours();
+        u.window_start = u.window_start.trim().to_string();
+        u.window_end = u.window_end.trim().to_string();
+        if u.window_start.is_empty() != u.window_end.is_empty() {
+            return Err(String::from(
+                "Updates: set both the start and the end of the maintenance window, or neither",
+            ));
+        }
+        if !u.window_start.is_empty()
+            && (updates::parse_hhmm(&u.window_start).is_none()
+                || updates::parse_hhmm(&u.window_end).is_none())
+        {
+            return Err(String::from(
+                "Updates: window times must be HH:MM (24-hour clock)",
+            ));
+        }
+        if u.auto {
+            u.check = true; // installing needs checking
+        }
+    }
+    Ok(())
+}
+
 pub async fn put_settings(
     State(st): State<Arc<AppState>>,
     Extension(p): Extension<Principal>,
@@ -681,86 +760,7 @@ pub async fn put_settings(
         .map(String::from);
     let mut s: Settings = serde_json::from_value(body)
         .map_err(|e| ApiError::bad(format!("invalid settings: {e}")))?;
-    if !s.acme_ca.is_empty()
-        && s.acme_ca != "custom"
-        && s.acme_ca != "caddy_internal"
-        && generator::ca_preset(&s.acme_ca).is_none()
-    {
-        return Err(ApiError::bad("unknown certificate authority"));
-    }
-    if !s.resolver_preset.is_empty() && s.resolver_preset != "custom" {
-        let Some(r) = generator::resolver_preset(&s.resolver_preset) else {
-            return Err(ApiError::bad("unknown resolver preset"));
-        };
-        s.resolvers = r.iter().map(|x| x.to_string()).collect();
-    }
-    if s.session_timeout_minutes <= 0 {
-        s.session_timeout_minutes = 60;
-    }
-    s.cert_alert_days.sort();
-    crate::shields::validate_security(&mut s.security)
-        .map_err(|e| ApiError::bad(format!("Security: {e}")))?;
-    if s.ddns.enabled {
-        if let Some(cid) = s.ddns.credential_id {
-            if st.store.credential(cid).is_err() {
-                return Err(ApiError::bad(
-                    "Dynamic DNS: that DNS provider account doesn't exist",
-                ));
-            }
-        }
-        for z in &mut s.ddns.domains {
-            z.zone = z.zone.trim().trim_end_matches('.').to_ascii_lowercase();
-            if !z.zone.is_empty() && !valid_host(&z.zone) {
-                return Err(ApiError::bad(format!(
-                    "Dynamic DNS: {:?} is not a valid zone",
-                    z.zone
-                )));
-            }
-            z.names = z
-                .names
-                .iter()
-                .map(|n| n.trim().to_string())
-                .filter(|n| !n.is_empty())
-                .collect();
-        }
-        s.ddns.domains.retain(|z| !z.zone.is_empty());
-        for src in &s.ddns.ip_sources {
-            if !matches!(
-                src.kind.as_str(),
-                "upnp" | "simple_http" | "interface" | "static"
-            ) {
-                return Err(ApiError::bad(format!(
-                    "Dynamic DNS: unknown IP source {:?}",
-                    src.kind
-                )));
-            }
-        }
-    }
-    {
-        let u = &mut s.updates;
-        if u.check_every_hours <= 0 {
-            u.check_every_hours = 6;
-        }
-        u.check_every_hours = u.interval_hours();
-        u.window_start = u.window_start.trim().to_string();
-        u.window_end = u.window_end.trim().to_string();
-        if u.window_start.is_empty() != u.window_end.is_empty() {
-            return Err(ApiError::bad(
-                "Updates: set both the start and the end of the maintenance window, or neither",
-            ));
-        }
-        if !u.window_start.is_empty()
-            && (updates::parse_hhmm(&u.window_start).is_none()
-                || updates::parse_hhmm(&u.window_end).is_none())
-        {
-            return Err(ApiError::bad(
-                "Updates: window times must be HH:MM (24-hour clock)",
-            ));
-        }
-        if u.auto {
-            u.check = true; // installing needs checking
-        }
-    }
+    check_settings(&st, &mut s).map_err(ApiError::bad)?;
     st.store.update_settings(|cur| {
         let setup = cur.setup_complete;
         *cur = s;

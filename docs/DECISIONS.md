@@ -51,3 +51,9 @@ Non-obvious calls, one line each, newest last.
   comes from the server as SVG, so the web app needs no QR library.
 - 2026-11-05 · Every panel answer carries `x-caddymium: 1`, so the kit web app tells a proxy's error page (the
   panel restarting) from the panel's own errors.
+- 2026-11-05 · Settings from a schema: backend/settings.toml describes Caddy's global options for kit-server-settings, and
+  settings_form.rs maps each flat key onto the panel's one settings document, so the generator, backups and the
+  DDNS, updates and Security pages keep reading the same values and the same checks apply. The kit routes live at
+  /api/settings/form* because /api/settings is the whole document. No key has an environment variable: these are
+  panel data, not deployment config. Lists are one-per-line text fields; DDNS, updates and Security keep their
+  own pages (rows and live status the schema can't describe).

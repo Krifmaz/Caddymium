@@ -927,3 +927,59 @@ async fn kit_routes_use_the_panel_sign_in() {
     assert_eq!(code, 200, "{list}");
     assert_eq!(list["crashes"].as_array().unwrap().len(), 1, "{list}");
 }
+
+#[tokio::test]
+async fn settings_pages_from_the_schema() {
+    let ts = start().await;
+    let mut c = TestClient::new(&ts.base);
+    assert_eq!(
+        c.call("GET", "/api/settings/form/schema", None).await.0,
+        401
+    );
+    c.call(
+        "POST",
+        "/api/setup",
+        Some(json!({"username": "admin", "password": "long enough password"})),
+    )
+    .await;
+    let (code, schema) = c.call("GET", "/api/settings/form/schema", None).await;
+    assert_eq!(code, 200, "{schema}");
+    assert!(
+        schema.to_string().contains("Certificate authority"),
+        "{schema}"
+    );
+    let (code, v) = c.call("GET", "/api/settings/form", None).await;
+    assert_eq!(code, 200, "{v}");
+    assert_eq!(v["acme_ca"], "letsencrypt");
+    assert_eq!(v["cert_alert_days"], "14, 7");
+
+    // a card's save lands in the panel's settings document
+    let (code, v) = c
+        .call(
+            "PUT",
+            "/api/settings/form",
+            Some(json!({"acme_email": "ops@example.com", "scan_ranges": "10.0.2.0/24\n10.0.3.0/24", "acme_eab_mac": "s3cret"})),
+        )
+        .await;
+    assert_eq!(code, 200, "{v}");
+    assert_eq!(v["acme_email"], "ops@example.com");
+    assert_ne!(v["acme_eab_mac"], "s3cret", "secrets are masked");
+    let (_, doc) = c.call("GET", "/api/settings", None).await;
+    assert_eq!(doc["acme_email"], "ops@example.com");
+    assert_eq!(doc["scan_ranges"], json!(["10.0.2.0/24", "10.0.3.0/24"]));
+    assert_eq!(doc["acme_eab_mac_set"], true);
+
+    // the panel's checks still apply
+    let (code, e) = c
+        .call(
+            "PUT",
+            "/api/settings/form",
+            Some(json!({"acme_ca": "nope"})),
+        )
+        .await;
+    assert_eq!(code, 400, "{e}");
+    assert!(
+        e.to_string().contains("unknown certificate authority"),
+        "{e}"
+    );
+}

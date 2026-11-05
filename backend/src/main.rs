@@ -23,6 +23,7 @@ mod registry;
 mod scan;
 mod secrets;
 mod server;
+mod settings_form;
 mod shields;
 mod store;
 mod suggestions;

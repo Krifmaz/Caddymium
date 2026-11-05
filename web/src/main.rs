@@ -58,6 +58,10 @@ fn kit_config() -> kit_leptos::config::AppConfig {
     cfg.script = NAME.to_string();
     cfg.logo = Some("favicon.svg".into());
     cfg.routes.changelog = "/whats-new".into();
+    // the panel's /api/settings is its whole settings document; the schema pages live beside it
+    cfg.paths.settings = "/settings/form".into();
+    cfg.paths.settings_schema = "/settings/form/schema".into();
+    cfg.paths.settings_secret = "/settings/form/secret/{key}".into();
     cfg
 }
 

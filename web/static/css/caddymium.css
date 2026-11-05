@@ -101,3 +101,6 @@ tr.off td { opacity: .5; text-decoration: line-through; }
 .job-running { border-color: var(--accent); }
 .actionbar { position: sticky; bottom: 16px; z-index: 5; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 18px;
   padding: 10px 10px 10px 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+/* tabs that are links (Settings pages) */
+.tabs a { padding: 7px 14px; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; text-decoration: none; }
+.tabs a.active { background: var(--panel-2); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.2); }

@@ -55,9 +55,11 @@ kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" 
 kit-server-notices = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
 kit-server-bugreports = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
 kit-server-diagnostics = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
 
 [build-dependencies]
 kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", default-features = false }
+kit-server-settings = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", default-features = false, features = ["toml"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
