@@ -200,3 +200,17 @@ mod tests {
         assert_eq!((i(&v, "n"), a(&v, "l").len()), (3, 1));
     }
 }
+
+thread_local! {
+    static META: RefCell<Option<Value>> = const { RefCell::new(None) };
+}
+
+/// `/api/meta` (what the forms offer: DNS providers, site kinds, notification types…), read once.
+pub async fn meta() -> Result<Value, api::ApiError> {
+    if let Some(m) = META.with(|m| m.borrow().clone()) {
+        return Ok(m);
+    }
+    let m = api::get("/meta").await?;
+    META.with(|x| *x.borrow_mut() = Some(m.clone()));
+    Ok(m)
+}

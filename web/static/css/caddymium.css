@@ -13,8 +13,7 @@
 .watchdog { display: block; margin-top: 4px; color: var(--warn); }
 .watchdog.err { color: var(--err); }
 .watchdog:hover { text-decoration: underline; }
-.btn.danger { border-color: rgba(239,68,68,.45); color: var(--err); }
-.btn.danger:hover { background: rgba(239,68,68,.12); border-color: var(--err); }
+.nav a { padding: 7px 12px; }
 .qr { width: 212px; height: 212px; padding: 6px; border-radius: 8px; background: #fff; }
 .qr svg { width: 200px; height: 200px; display: block; }
 .pending-bar { position: fixed; bottom: 22px; left: calc(50% + var(--sidebar) / 2); transform: translateX(-50%); z-index: 20;
@@ -35,3 +34,57 @@
 @media (max-width: 420px) {
   .pending-bar .pending-text { display: none; }
 }
+/* alerts: a coloured box with an icon */
+.alert { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--panel-2); }
+.alert .alert-ic { display: inline-grid; flex: none; margin-top: 1px; }
+.alert .alert-ic svg { width: 18px; height: 18px; }
+.alert.ok { border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.1); }
+.alert.ok .alert-ic { color: var(--ok); }
+.alert.info { border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.1); }
+.alert.info .alert-ic { color: var(--info); }
+.alert.warn { border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.1); }
+.alert.warn .alert-ic { color: var(--warn); }
+.alert.err { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.1); }
+.alert.err .alert-ic { color: var(--err); }
+.plan-errors { margin: 6px 0 0; padding-left: 18px; }
+.plan-errors li { white-space: pre-wrap; word-break: break-word; }
+/* code and diffs */
+pre.code-block { margin: 0; padding: 14px 16px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+  overflow: auto; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+.diff { border: 1px solid var(--border); border-radius: 10px; overflow: auto; background: var(--bg-2); }
+.diff table { border-collapse: collapse; width: 100%; font: 12.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.diff td { padding: 0 8px; white-space: pre; vertical-align: top; }
+.diff .n { width: 1%; min-width: 38px; text-align: right; color: var(--faint); user-select: none; }
+.diff .sign { width: 1%; padding: 0 4px; color: var(--faint); user-select: none; }
+.diff .code { width: 100%; tab-size: 4; }
+.diff tr.add { background: rgba(34,197,94,.12); }
+.diff tr.add .code, .diff tr.add .sign, .diff tr.add .n { color: var(--ok); }
+.diff tr.del { background: rgba(239,68,68,.12); }
+.diff tr.del .code, .diff tr.del .sign, .diff tr.del .n { color: var(--err); }
+.diff tr.hunk td { color: var(--muted); background: var(--panel-2); padding: 4px 12px; font-size: 11.5px; }
+.scroll-55 { max-height: 55vh; overflow: auto; }
+.table tr.clickable { cursor: pointer; }
+.nowrap { white-space: nowrap; }
+.summary { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.sum-item { display: flex; align-items: center; gap: 12px; }
+.sum-ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); }
+.sum-ic svg { width: 20px; height: 20px; }
+.sum-ic.ok { color: var(--ok); background: rgba(34,197,94,.12); }
+.sum-ic.err { color: var(--err); background: rgba(239,68,68,.12); }
+.sum-label { font-size: 12px; color: var(--muted); }
+.sum-val { font-weight: 650; font-size: 15px; }
+.plus { color: var(--ok); }
+.minus { color: var(--err); }
+.sum-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.badge.accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .4); background: rgba(var(--accent-rgb), .1); }
+@media (max-width: 760px) {
+  .hide-sm { display: none; }
+  .sum-actions { margin-left: 0; width: 100%; }
+  .sum-actions .btn { flex: 1; }
+}
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px; }
+.ev-grid label { gap: 8px; }
+pre.peek { max-height: 140px; overflow: hidden; margin: 0; }
+button.card.item { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 8px; width: 100%; }
+button.card.item:hover { border-color: var(--accent); }

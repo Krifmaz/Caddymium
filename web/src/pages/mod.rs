@@ -1,8 +1,13 @@
 //! The panel's pages, one module each, and which one the address shows.
 
 pub mod account;
+pub mod audit;
+pub mod deploy;
 pub mod kit;
 pub mod login;
+pub mod notifications;
+pub mod snippets;
+pub mod users;
 
 use crate::app::Route;
 use crate::ui::Classic;
@@ -13,6 +18,13 @@ use leptos::prelude::*;
 pub fn page(route: &Route) -> AnyView {
     match route.page() {
         "account" => view! { <account::Account/> }.into_any(),
+        "audit" => view! { <audit::Audit/> }.into_any(),
+        "changes" => view! { <deploy::Changes/> }.into_any(),
+        "history" => view! { <deploy::History/> }.into_any(),
+        "caddyfile" => view! { <deploy::Caddyfile/> }.into_any(),
+        "users" => view! { <users::Users/> }.into_any(),
+        "notifications" => view! { <notifications::Notifications/> }.into_any(),
+        "snippets" => view! { <snippets::Snippets/> }.into_any(),
         "bug-reports" => view! { <kit::BugReports/> }.into_any(),
         "diagnostics" => view! { <kit::Diagnostics/> }.into_any(),
         "whats-new" => view! { <kit::WhatsNew/> }.into_any(),
