@@ -2,10 +2,13 @@
 
 pub mod account;
 pub mod audit;
+pub mod ddns;
 pub mod deploy;
+pub mod domains;
 pub mod kit;
 pub mod login;
 pub mod notifications;
+pub mod plugins;
 pub mod snippets;
 pub mod users;
 
@@ -18,6 +21,9 @@ use leptos::prelude::*;
 pub fn page(route: &Route) -> AnyView {
     match route.page() {
         "account" => view! { <account::Account/> }.into_any(),
+        "domains" => view! { <domains::Domains/> }.into_any(),
+        "ddns" => view! { <ddns::Ddns/> }.into_any(),
+        "plugins" => view! { <plugins::Plugins/> }.into_any(),
         "audit" => view! { <audit::Audit/> }.into_any(),
         "changes" => view! { <deploy::Changes/> }.into_any(),
         "history" => view! { <deploy::History/> }.into_any(),

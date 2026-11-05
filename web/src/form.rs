@@ -4,11 +4,15 @@
 use leptos::prelude::*;
 use serde_json::{Map, Value};
 
-/// The value at `path` (`a.b.c`) in `v`, Null when missing.
+/// The value at `path` (`a.b.c`, `list.0.name` for array items) in `v`, Null when missing.
 pub fn get_path(v: &Value, path: &str) -> Value {
     let mut cur = v;
     for k in path.split('.') {
-        match cur.get(k) {
+        let next = match (cur, k.parse::<usize>()) {
+            (Value::Array(l), Ok(n)) => l.get(n),
+            _ => cur.get(k),
+        };
+        match next {
             Some(x) => cur = x,
             None => return Value::Null,
         }
@@ -21,6 +25,17 @@ pub fn set_path(v: &mut Value, path: &str, x: Value) {
     let mut cur = v;
     let keys: Vec<&str> = path.split('.').collect();
     for (n, k) in keys.iter().enumerate() {
+        if let (Value::Array(l), Ok(at)) = (&*cur, k.parse::<usize>()) {
+            if at < l.len() {
+                let item = &mut cur.as_array_mut().expect("an array")[at];
+                if n == keys.len() - 1 {
+                    *item = x;
+                    return;
+                }
+                cur = item;
+                continue;
+            }
+        }
         if !cur.is_object() {
             *cur = Value::Object(Map::new());
         }
@@ -168,6 +183,10 @@ mod tests {
         assert_eq!(str_at(&v, "a.c.d"), "x");
         assert_eq!(str_at(&v, "a.b"), "1");
         set_path(&mut v, "top", json!(true));
+        let mut l = json!({"list": [{"a": 1}, {"a": 2}]});
+        set_path(&mut l, "list.1.a", json!(5));
+        assert_eq!(get_path(&l, "list.1.a"), json!(5));
+        assert_eq!(get_path(&l, "list.0.a"), json!(1));
         assert_eq!(v["top"], json!(true));
     }
 }
