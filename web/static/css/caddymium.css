@@ -136,3 +136,11 @@ details.editor-sec > summary::-webkit-details-marker { display: none; }
 .tpl { background: linear-gradient(120deg, rgba(var(--accent-rgb), .1), var(--panel) 70%); }
 @media (max-width: 1000px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .site-grid { grid-template-columns: 1fr; } }
+
+/* Security */
+.pill { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+.pill.on { color: var(--accent); border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .12); }
+.pill.inherit { border-style: dashed; opacity: .75; }
+select.mini { padding: 3px 6px; font-size: 12px; min-width: 0; width: auto; }
+.matrix { overflow-x: auto; }
+.matrix th, .matrix td { white-space: nowrap; }
