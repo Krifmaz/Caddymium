@@ -135,19 +135,6 @@ pub fn PendingBar(route: ReadSignal<Route>) -> impl IntoView {
     }
 }
 
-/// A page that is still in the classic panel: what it is, and a link to it.
-#[component]
-pub fn Classic(#[prop(into)] title: String, #[prop(into)] path: String) -> impl IntoView {
-    let href = format!("/#/{path}");
-    view! {
-        <PageHead title=title.clone()/>
-        <div class="card mt">
-            <p style="margin-top:0">{format!("{title} hasn't moved to the new look yet.")}</p>
-            <a class="btn primary" href=href inner_html=format!("{}Open it in the classic panel", icon("external"))></a>
-        </div>
-    }
-}
-
 // ---------------------------------------------------------------- times, files
 
 /// "just now", "5 min ago", "3 h ago", else the date.
