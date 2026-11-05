@@ -226,7 +226,7 @@ impl Manager {
         self
     }
 
-    fn send(&self, event: &str, title: &str, msg: &str) {
+    pub fn send(&self, event: &str, title: &str, msg: &str) {
         if let Some(n) = &self.notify {
             n(event, title, msg);
         }
@@ -800,10 +800,25 @@ impl Manager {
         expect: Option<(&str, &Capabilities)>,
         fallbacks: Vec<Fallback>,
     ) -> Result<()> {
+        let out = self.restart_outcome(expect, fallbacks).await;
+        self.outcome_result(&out).await
+    }
+
+    async fn restart_outcome(
+        &self,
+        expect: Option<(&str, &Capabilities)>,
+        fallbacks: Vec<Fallback>,
+    ) -> Outcome {
         let log = |l: &str| self.log(l);
         let check =
             || -> crate::apply::BoxFut<'_, Result<()>> { Box::pin(self.refresh_caps(expect)) };
-        match self.restarter.restart(&log, &check, &fallbacks).await {
+        self.restarter.restart(&log, &check, &fallbacks).await
+    }
+
+    /// Notifies a rollback or an outage and turns it into an error that says
+    /// what happened and what to do.
+    async fn outcome_result(&self, out: &Outcome) -> Result<()> {
+        match out {
             Outcome::Serving => Ok(()),
             Outcome::RolledBack { to, why } => {
                 let _ = self.refresh_caps(None).await;
@@ -817,12 +832,27 @@ impl Manager {
             Outcome::Down { why } => {
                 let msg = format!(
                     "Caddy is not serving: {why}. Restarting it and rolling back did not help. \
-                     Check the Caddy log (docker logs on the Caddy container), fix the cause, then use Restart on the Plugins page."
+                     Check the Caddy log (docker logs on the Caddy container), fix the cause, then use Restart Caddy on the Plugins page."
                 );
                 self.send(notify::EVENT_CADDY_DOWN, "Caddy is down", &msg);
                 Err(anyhow!(msg))
             }
         }
+    }
+
+    /// The watchdog's restart: shown as a job on the Plugins page, falls back
+    /// to the image's Caddy when the custom build won't serve. Fails without
+    /// doing anything while another job runs.
+    pub async fn recover(&self, why: &str) -> Result<Outcome> {
+        self.start_job("watchdog", Vec::new())?;
+        self.log(why);
+        self.store.audit("watchdog", "caddy.restart", "", why, "");
+        let out = self
+            .restart_outcome(None, vec![self.image_fallback()])
+            .await;
+        let r = self.outcome_result(&out).await;
+        self.finish(r);
+        Ok(out)
     }
 
     /// Re-detects the running Caddy and, with `expect`, checks it is that
@@ -1101,7 +1131,7 @@ fn default_category(path: &str, modules: &[&str]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -1285,6 +1315,153 @@ mod tests {
             .port()
     }
 
+    /// A real Caddy run by the supervisor with one site, a plugin manager
+    /// wired to it (short time limits) and a stand-in download service that
+    /// serves whatever `payload` holds.
+    pub(crate) struct Harness {
+        _dir: tempfile::TempDir,
+        pub bin: PathBuf,
+        pub m: Arc<Manager>,
+        pub store: Arc<Store>,
+        pub caps: Arc<RwLock<Capabilities>>,
+        pub payload: Arc<Mutex<Vec<u8>>>,
+        pub sent: Arc<Mutex<Vec<String>>>,
+        pub caddyfile: PathBuf,
+        stop: tokio::sync::watch::Sender<bool>,
+        sup: tokio::task::JoinHandle<()>,
+    }
+
+    impl Harness {
+        pub async fn start(bin: &str) -> Harness {
+            use crate::caddy::control::ProcessHandle;
+            let bin = std::fs::canonicalize(bin).unwrap();
+            let dir = tempfile::tempdir().unwrap();
+            let (admin_port, site_port) = (free_port(), free_port());
+            let admin_addr = format!("127.0.0.1:{admin_port}");
+            let managed = crate::supervisor::Managed {
+                image_bin: bin.clone(),
+                caddy_bin: dir.path().join("bin").join("caddy"),
+                caddyfile: dir.path().join("Caddyfile"),
+                admin_listen: admin_addr.clone(),
+                admin_origins: vec![admin_addr.clone()],
+                secrets_dir: dir.path().join("secrets"),
+                log_dir: dir.path().join("logs"),
+                data_dir: dir.path().join("data"),
+                config_dir: dir.path().join("config"),
+            };
+            std::fs::write(
+                &managed.caddyfile,
+                format!(
+                    "{{\n\tadmin {admin_addr} {{\n\t\torigins {admin_addr}\n\t}}\n}}\n:{site_port} {{\n\trespond \"ok\"\n}}\n"
+                ),
+            )
+            .unwrap();
+            managed.prepare().unwrap();
+
+            let payload = Arc::new(Mutex::new(std::fs::read(&bin).unwrap()));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base = format!("http://{}", listener.local_addr().unwrap());
+            let p = payload.clone();
+            let app = axum::Router::new().route(
+                "/api/download",
+                axum::routing::get(move || {
+                    let p = p.clone();
+                    async move { p.lock().unwrap().clone() }
+                }),
+            );
+            tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+            let admin = Arc::new(Admin::new(&admin_addr));
+            let process = Arc::new(ProcessHandle::default());
+            let (stop, stop_rx) = tokio::sync::watch::channel(false);
+            let sup = tokio::spawn(managed.clone().run(admin.clone(), process.clone(), stop_rx));
+            admin
+                .wait_ready(Duration::from_secs(20))
+                .await
+                .expect("caddy up");
+
+            let store = Arc::new(
+                Store::open_memory(Arc::new(crate::secrets::SecretBox::new(b"k").unwrap()))
+                    .unwrap(),
+            );
+            let runner = Arc::new(Runner::new(&managed.caddy_bin));
+            let caps = Arc::new(RwLock::new(runner.capabilities().await.unwrap()));
+            let pipeline = Arc::new(Pipeline::new(crate::apply::PipelineParts {
+                store: store.clone(),
+                validator: runner.clone(),
+                admin: admin.clone(),
+                health: Arc::new(crate::apply::DefaultHealth {
+                    admin: admin.clone(),
+                    probe_addrs: vec![],
+                    settle: Duration::ZERO,
+                }),
+                secrets: None,
+                env: crate::generator::Env {
+                    admin_listen: admin_addr.clone(),
+                    log_dir: crate::secrets::to_slash(&dir.path().join("logs")),
+                    ..Default::default()
+                },
+                persist_path: dir.path().join("Caddyfile.generated"),
+                caps: caps.clone(),
+                notify: None,
+            }));
+            let sent = Arc::new(Mutex::new(Vec::<String>::new()));
+            let s2 = sent.clone();
+            let mut m = Manager::new(
+                store.clone(),
+                admin.clone(),
+                caps.clone(),
+                pipeline,
+                managed.caddy_bin.clone(),
+                String::new(),
+                String::new(),
+            )
+            .with_recovery(
+                process.clone(),
+                vec![format!("127.0.0.1:{site_port}")],
+                Some(Arc::new(move |e: &str, _t: &str, _m: &str| {
+                    s2.lock().unwrap().push(e.to_string())
+                })),
+            );
+            m.base_url = base;
+            {
+                let r = Arc::get_mut(&mut m.restarter).unwrap();
+                r.timing.up = Duration::from_secs(10);
+                r.timing.down = Duration::from_secs(5);
+                r.timing.stop = Duration::from_secs(3);
+            }
+            Harness {
+                bin,
+                m: Arc::new(m),
+                store,
+                caps,
+                payload,
+                sent,
+                caddyfile: managed.caddyfile.clone(),
+                _dir: dir,
+                stop,
+                sup,
+            }
+        }
+
+        pub async fn finish_job(&self) -> JobState {
+            for _ in 0..1200 {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                if let Some(j) = self.m.current_job() {
+                    if j.status != "running" {
+                        return j;
+                    }
+                }
+            }
+            panic!("job did not finish");
+        }
+
+        pub async fn shutdown(self) {
+            self.stop.send(true).unwrap();
+            let _ = tokio::time::timeout(Duration::from_secs(30), self.sup).await;
+        }
+    }
+
     /// The whole update path against a real Caddy run by the supervisor: a
     /// good build is installed and serves; then a build that hangs instead
     /// of serving is installed, is killed, retried once and rolled back, and
@@ -1293,122 +1470,14 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn update_rolls_back_a_build_that_hangs() {
-        use crate::caddy::control::ProcessHandle;
         let Ok(bin) = std::env::var("CADDY_BIN") else {
             return;
         };
-        let bin = std::fs::canonicalize(bin).unwrap();
-        let dir = tempfile::tempdir().unwrap();
-        let (admin_port, site_port) = (free_port(), free_port());
-        let admin_addr = format!("127.0.0.1:{admin_port}");
-        let managed = crate::supervisor::Managed {
-            image_bin: bin.clone(),
-            caddy_bin: dir.path().join("bin").join("caddy"),
-            caddyfile: dir.path().join("Caddyfile"),
-            admin_listen: admin_addr.clone(),
-            admin_origins: vec![admin_addr.clone()],
-            secrets_dir: dir.path().join("secrets"),
-            log_dir: dir.path().join("logs"),
-            data_dir: dir.path().join("data"),
-            config_dir: dir.path().join("config"),
-        };
-        std::fs::write(
-            &managed.caddyfile,
-            format!(
-                "{{\n\tadmin {admin_addr} {{\n\t\torigins {admin_addr}\n\t}}\n}}\n:{site_port} {{\n\trespond \"ok\"\n}}\n"
-            ),
-        )
-        .unwrap();
-        managed.prepare().unwrap();
-
-        // A stand-in for caddyserver.com that serves whatever `payload` holds.
-        let payload = Arc::new(Mutex::new(std::fs::read(&bin).unwrap()));
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        let p = payload.clone();
-        let app = axum::Router::new().route(
-            "/api/download",
-            axum::routing::get(move || {
-                let p = p.clone();
-                async move { p.lock().unwrap().clone() }
-            }),
-        );
-        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-
-        let admin = Arc::new(Admin::new(&admin_addr));
-        let process = Arc::new(ProcessHandle::default());
-        let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
-        let sup = tokio::spawn(managed.clone().run(admin.clone(), process.clone(), stop_rx));
-        admin
-            .wait_ready(Duration::from_secs(20))
-            .await
-            .expect("caddy up");
-
-        let store = Arc::new(
-            Store::open_memory(Arc::new(crate::secrets::SecretBox::new(b"k").unwrap())).unwrap(),
-        );
-        let runner = Arc::new(Runner::new(&managed.caddy_bin));
-        let caps = Arc::new(RwLock::new(runner.capabilities().await.unwrap()));
-        let pipeline = Arc::new(Pipeline::new(crate::apply::PipelineParts {
-            store: store.clone(),
-            validator: runner.clone(),
-            admin: admin.clone(),
-            health: Arc::new(crate::apply::DefaultHealth {
-                admin: admin.clone(),
-                probe_addrs: vec![],
-                settle: Duration::ZERO,
-            }),
-            secrets: None,
-            env: crate::generator::Env {
-                admin_listen: admin_addr.clone(),
-                log_dir: crate::secrets::to_slash(&dir.path().join("logs")),
-                ..Default::default()
-            },
-            persist_path: dir.path().join("Caddyfile.generated"),
-            caps: caps.clone(),
-            notify: None,
-        }));
-        let sent = Arc::new(Mutex::new(Vec::<String>::new()));
-        let s2 = sent.clone();
-        let mut m = Manager::new(
-            store.clone(),
-            admin.clone(),
-            caps.clone(),
-            pipeline,
-            managed.caddy_bin.clone(),
-            String::new(),
-            String::new(),
-        )
-        .with_recovery(
-            process.clone(),
-            vec![format!("127.0.0.1:{site_port}")],
-            Some(Arc::new(move |e: &str, _t: &str, _m: &str| {
-                s2.lock().unwrap().push(e.to_string())
-            })),
-        );
-        m.base_url = base;
-        {
-            let r = Arc::get_mut(&mut m.restarter).unwrap();
-            r.timing.up = Duration::from_secs(10);
-            r.timing.down = Duration::from_secs(5);
-            r.timing.stop = Duration::from_secs(3);
-        }
-        let m = Arc::new(m);
-        let wait = |m: Arc<Manager>| async move {
-            for _ in 0..1200 {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                if let Some(j) = m.current_job() {
-                    if j.status != "running" {
-                        return j;
-                    }
-                }
-            }
-            panic!("job did not finish");
-        };
-
+        let h = Harness::start(&bin).await;
+        let (m, bin) = (h.m.clone(), h.bin.clone());
         // 1. A good build: installed, restarted, serving.
         m.start_install(vec![], vec![], "t".into()).unwrap();
-        let j = wait(m.clone()).await;
+        let j = h.finish_job().await;
         assert_eq!(j.status, "done", "{}", j.log.join("\n"));
         m.restarter
             .serving()
@@ -1421,9 +1490,9 @@ mod tests {
             bin.display()
         );
         script.push_str(&format!("# {}\n", "x".repeat(2 << 20)));
-        *payload.lock().unwrap() = script.into_bytes();
+        *h.payload.lock().unwrap() = script.into_bytes();
         m.start_install(vec![], vec![], "t".into()).unwrap();
-        let j = wait(m.clone()).await;
+        let j = h.finish_job().await;
         let log = j.log.join("\n");
         assert_eq!(j.status, "failed", "{log}");
         assert!(
@@ -1446,9 +1515,8 @@ mod tests {
                 && std::fs::metadata(m.custom_path()).unwrap().len() > 10 << 20,
             "the real binary, not the stand-in"
         );
-        assert_eq!(*sent.lock().unwrap(), vec![notify::EVENT_CADDY_RECOVERED]);
+        assert_eq!(*h.sent.lock().unwrap(), vec![notify::EVENT_CADDY_RECOVERED]);
 
-        stop_tx.send(true).unwrap();
-        let _ = tokio::time::timeout(Duration::from_secs(30), sup).await;
+        h.shutdown().await;
     }
 }

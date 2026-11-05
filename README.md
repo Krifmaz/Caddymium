@@ -151,6 +151,7 @@ All configuration is environment variables (see [.env.example](.env.example)). T
 | `CADDYMIUM_INITIAL_ADMIN_USER` / `_PASSWORD` | — | Create the admin unattended |
 | `CADDYMIUM_BASE_URL` | — | Public URL of the panel (enables Secure cookies) |
 | `CADDYMIUM_TRUST_PROXY_HEADERS` | `false` | Trust `X-Forwarded-For` (panel behind Caddy) |
+| `CADDYMIUM_WATCHDOG` | `true` | Restart Caddy when its admin API or listeners stop answering for 60s (shown in the sidebar, notified as *Caddy rolled back or restarted*) |
 | `CADDYMIUM_LISTEN` | `:8080` | Panel listen address |
 | `CADDYMIUM_CADDY_ADMIN` | `caddy-admin:2019` | Caddy admin API address (TCP or `unix//path`) |
 | `CADDYMIUM_CADDY_ARCH` | detected | Architecture for plugin downloads (`amd64`, `arm64`) |

@@ -26,6 +26,7 @@ mod shields;
 mod store;
 mod supervisor;
 mod updates;
+mod watchdog;
 mod web;
 
 use anyhow::{Context, Result};
@@ -209,6 +210,16 @@ async fn run(cfg: config::Config) -> Result<()> {
         managed.prepare().context("prepare caddy directories")?;
         bootstrap_managed_config(&managed, &state).await;
         tokio::spawn(managed.run(state.admin.clone(), process.clone(), stop_rx.clone()));
+    }
+
+    // Restarts Caddy when it stops serving for a minute.
+    if cfg.watchdog {
+        let wd = Arc::new(watchdog::Watchdog::new(
+            store.clone(),
+            state.plugins.clone(),
+            caps.clone(),
+        ));
+        tokio::spawn(wd.run(stop_rx.clone()));
     }
 
     // Update checker and automatic Caddy updates (settings decide what it does).

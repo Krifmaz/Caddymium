@@ -99,6 +99,12 @@ pub async fn status(State(st): State<Arc<AppState>>) -> ApiResult {
             );
         }
     }
+    if let Some(w) = crate::watchdog::Watchdog::last(&st.store) {
+        res.insert(
+            "watchdog".into(),
+            serde_json::to_value(w).unwrap_or_default(),
+        );
+    }
     // From the background checker: no network call here.
     let u = st.updates.state();
     res.insert("update_available".into(), u.update_available.into());

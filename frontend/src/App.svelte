@@ -87,6 +87,11 @@
   const showWelcome = $derived(app.me?.user && can.admin() && app.me.setup_complete === false && page !== 'import')
   const st = $derived(app.status)
   const isMac = navigator.platform.toLowerCase().includes('mac')
+  const wdTime = (at) => {
+    const d = new Date(at)
+    const sameDay = d.toDateString() === new Date().toDateString()
+    return sameDay ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+  }
   const toastIcon = { ok: CircleCheck, err: CircleX, info: Info }
 </script>
 
@@ -137,6 +142,11 @@
             <span class="dot"></span><span class="faint">Checking Caddy…</span>
           {/if}
         </div>
+        {#if st?.watchdog && Date.now() - new Date(st.watchdog.at).getTime() < 86400000}
+          <a class="watchdog xs" class:err={!st.watchdog.ok} href="#/plugins" title={`${st.watchdog.reason}\n${st.watchdog.outcome}`}>
+            {st.watchdog.ok ? 'Caddy restarted by watchdog' : 'Watchdog could not restart Caddy'} at {wdTime(st.watchdog.at)}
+          </a>
+        {/if}
         <div class="me">
           <a href="#/account" class="me-link" class:active={page === 'account'} onclick={() => (menuOpen = false)}>
             <span class="avatar me-av">{app.me.user.username[0]?.toUpperCase()}</span>
@@ -243,6 +253,9 @@
   }
   .search:hover { border-color: var(--border-strong); color: var(--text-2); }
 
+  .watchdog { display: block; padding: 2px 10px 6px; color: var(--warn-soft-text, var(--muted)); text-decoration: none; }
+  .watchdog.err { color: var(--err, #ef4444); }
+  .watchdog:hover { text-decoration: underline; }
   nav { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; flex: 1; padding: 0 2px; }
   .group { font-size: 11px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 10px 6px; }
   .group:first-child { padding-top: 4px; }
