@@ -196,6 +196,7 @@ backend/src/
   caddy/        caddy CLI runner + admin API client
   scan.rs       "Find app" network scanner
   notify.rs     notification channels (webhooks, ntfy, Gotify, email, …)
+  kit.rs        Krifmaz kit server crates: health, What's new, notices, bug reports, diagnostics
 frontend/       Svelte 5 UI
 caddy/          Caddy image (xcaddy + plugins) and entrypoint
 ```

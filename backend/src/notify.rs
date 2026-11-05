@@ -22,6 +22,7 @@ pub const EVENT_BACKUP_FAILED: &str = "backup_failed";
 pub const EVENT_CADDY_DOWN: &str = "caddy_down";
 pub const EVENT_CADDY_RECOVERED: &str = "caddy_recovered";
 pub const EVENT_DISCOVERY: &str = "discovery";
+pub const EVENT_BUG_REPORT: &str = "bug_report";
 
 /// Events for the UI.
 pub const ALL_EVENTS: &[&str] = &[
@@ -37,6 +38,7 @@ pub const ALL_EVENTS: &[&str] = &[
     EVENT_DISCOVERY,
     EVENT_CADDY_DOWN,
     EVENT_CADDY_RECOVERED,
+    EVENT_BUG_REPORT,
 ];
 
 /// Supported channel types and their config fields.

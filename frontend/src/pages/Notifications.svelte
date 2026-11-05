@@ -16,7 +16,7 @@
     apply_failed: 'Config apply failed', cert_expiring: 'Certificate expiring', cert_error: 'Certificate error',
     upstream_down: 'Upstream down', upstream_up: 'Upstream back up', update_available: 'Caddy update available', update_installed: 'Caddy updated automatically', update_failed: 'Automatic Caddy update failed',
     backup_failed: 'Backup failed', discovery: 'New container discovered',
-    caddy_down: 'Caddy is down', caddy_recovered: 'Caddy rolled back or restarted',
+    caddy_down: 'Caddy is down', caddy_recovered: 'Caddy rolled back or restarted', bug_report: 'Bug report filed',
   }
   const fieldLabels = { url: 'URL', token: 'Token', priority: 'Priority', header: 'Extra header (Name: value)', host: 'SMTP host', port: 'Port', username: 'Username', password: 'Password', from: 'From address', to: 'To address', tls: 'TLS (starttls / tls / none)' }
   const secret = new Set(['token', 'password', 'header'])

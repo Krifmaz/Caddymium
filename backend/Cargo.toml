@@ -18,7 +18,7 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
 webpki-roots = "1"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 argon2 = "0.6"
@@ -47,6 +47,17 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 url = "2"
+# Krifmaz/kit, pinned to one release tag. To update: read the kit's CHANGELOG.md, bump the tag on every line,
+# run the tests.
+kit-server-core = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", features = ["sqlite"] }
+kit-server-health = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-notices = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-bugreports = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+kit-server-diagnostics = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1" }
+
+[build-dependencies]
+kit-server-changelog = { git = "https://github.com/Krifmaz/kit", tag = "v0.2.1", default-features = false }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

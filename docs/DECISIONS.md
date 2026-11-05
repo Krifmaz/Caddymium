@@ -30,3 +30,14 @@ Non-obvious calls, one line each, newest last.
 - 2026-11-05 · Copyable errors (goal 6) are built in the Svelte UI for now (error toasts stay until closed with Copy and
   merge duplicates; every error box has Copy; server errors say what to do). The kit's web components are Leptos, so
   they arrive with the kit adoption, which replaces these.
+- 2026-11-05 · Kit pinned at v0.2.1 (latest tag). rusqlite goes 0.40 → 0.39 so the panel and the kit link one
+  sqlite3 (the panel's code needed no change).
+- 2026-11-05 · The kit's tables live in `kit.db` next to `caddymium.db`, so the panel's backups, restores and
+  migrations never touch them. Losing it loses only bug reports, crash logs and What's new "seen" marks.
+- 2026-11-05 · The kit's routes use the panel's sign-in (sessions, API keys, CSRF, 2FA). Panel admins are the kit's
+  admins and owner; editors and viewers are members. The kit's `/api/health` replaces the panel's own.
+- 2026-11-05 · Notices: Caddy not serving (every 30s, quiet while a plugin job runs), a failed automatic update
+  (every 5 min) and the data folder. Diagnostics: admin API, listeners, data folder, database, Caddy log folder.
+  A new bug report notifies through the panel's channels (event `bug_report`).
+- 2026-11-05 · docs/releases/0.7.0.md makes the next release 0.7.0 (the reliability work plus the kit's server
+  side); the notes say the kit's web app follows, so they never promise what isn't shipped.
