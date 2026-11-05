@@ -89,6 +89,22 @@
     setSite(site, { [key]: next })
   }
 
+  // Suggestions: protections a newer version recommends, never switched on
+  // for existing sites by the update itself.
+  let pick = $state({})
+  async function suggest(sg, siteId) {
+    busy = true
+    try {
+      take(await api.post(`/security/suggestions/${sg.id}/apply`, siteId ? { site_id: Number(siteId) } : {}))
+      toast(siteId ? 'Turned on for that site. Apply on Review & apply to update Caddy.' : 'Turned on for all sites. Apply on Review & apply to update Caddy.')
+      refreshStatus()
+    } catch (e) { toastErr(e) }
+    busy = false
+  }
+  async function dismissSuggestion(sg) {
+    try { take(await api.post(`/security/suggestions/${sg.id}/dismiss`)) } catch (e) { toastErr(e) }
+  }
+
   async function crowdsec(action) {
     busy = true
     try {
@@ -151,6 +167,27 @@
   <p class="muted">Loading…</p>
 {:else}
   <div class="stack">
+    {#if d.suggestions?.length && can.admin()}
+      <div class="card stack suggestions">
+        <div class="card-head"><div><h2>Suggested protections</h2><div class="desc">Newer versions recommend these. Updates never switch them on for sites you already have; turn them on here if you want them.</div></div></div>
+        {#each d.suggestions as sg (sg.id)}
+          <div class="suggestion">
+            <div class="grow"><strong>{sg.title}</strong><div class="hint">{sg.body} Not on for {sg.sites.length === 1 ? sg.sites[0].name : `${sg.sites.length} sites`}.</div></div>
+            <div class="row wrap">
+              <button class="btn primary sm" disabled={busy} onclick={() => suggest(sg)}>Turn on for all sites</button>
+              {#if sg.sites.length > 1}
+                <select bind:value={pick[sg.id]} aria-label="Site">
+                  <option value={undefined}>One site…</option>
+                  {#each sg.sites as s}<option value={s.id}>{s.name}</option>{/each}
+                </select>
+                <button class="btn sm" disabled={busy || !pick[sg.id]} onclick={() => suggest(sg, pick[sg.id])}>Turn on</button>
+              {/if}
+              <button class="btn ghost sm" onclick={() => dismissSuggestion(sg)}>Dismiss</button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
     <!-- Defaults -->
     <div class="card stack">
       <div class="card-head"><div><h2>Protection for all sites</h2><div class="desc">What every site gets unless it says otherwise below.</div></div></div>
@@ -379,6 +416,10 @@
 {/if}
 
 <style>
+  .suggestion { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border); }
+  .suggestion .grow { flex: 1 1 260px; }
+  .suggestion .row { flex: 0 1 auto; align-items: center; gap: 8px; }
+  .suggestion select { width: auto; max-width: 200px; }
   .opts { display: grid; gap: 14px; }
   .opt { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
   .opt :global(.switch) { margin-top: 2px; }

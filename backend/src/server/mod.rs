@@ -639,6 +639,14 @@ pub fn router(st: Arc<AppState>) -> Router {
             "/security/bots/refresh",
             post(security_handlers::refresh_bots),
         )
+        .route(
+            "/security/suggestions/{id}/apply",
+            post(security_handlers::apply_suggestion),
+        )
+        .route(
+            "/security/suggestions/{id}/dismiss",
+            post(security_handlers::dismiss_suggestion),
+        )
         .route("/security/sessions", get(security_handlers::sessions))
         .route(
             "/security/sessions/{id}",
