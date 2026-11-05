@@ -195,6 +195,64 @@ impl kit_server_diagnostics::Diagnostics for KitState {
     fn diagnostics(&self) -> Registry<KitState> {
         diagnostics()
     }
+
+    /// The checks plus the panel's version, its user, the time and the
+    /// environment variables it was started with (secrets hidden).
+    fn answer(
+        &self,
+        checks: Vec<serde_json::Value>,
+    ) -> impl std::future::Future<Output = kit_server_core::Result<serde_json::Value>> + Send {
+        let version = self.0.version.clone();
+        async move {
+            let time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0);
+            Ok(serde_json::json!({
+                "checks": checks,
+                "version": version,
+                "uid": process_uid(),
+                "time": time,
+                "settings": env_settings(std::env::vars()),
+            }))
+        }
+    }
+}
+
+/// The user the panel runs as, None where that can't be told.
+fn process_uid() -> Option<u32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::metadata("/proc/self").ok().map(|m| m.uid())
+    }
+    #[cfg(not(unix))]
+    None
+}
+
+/// The panel's environment variables (`CADDYMIUM_*`, and the older
+/// `CADDYHUB_*`) for the Diagnostics page, secrets hidden.
+pub fn env_settings(vars: impl Iterator<Item = (String, String)>) -> Vec<serde_json::Value> {
+    let mut out: Vec<serde_json::Value> = vars
+        .filter(|(k, _)| k.starts_with("CADDYMIUM_") || k.starts_with("CADDYHUB_"))
+        .map(|(k, v)| {
+            let secret = ["PASSWORD", "TOKEN", "SECRET", "KEY"]
+                .iter()
+                .any(|w| k.contains(w));
+            let shown = if secret && !v.is_empty() {
+                "•••• (set)".to_string()
+            } else {
+                v
+            };
+            let key = k
+                .trim_start_matches("CADDYMIUM_")
+                .trim_start_matches("CADDYHUB_")
+                .to_ascii_lowercase();
+            serde_json::json!({"key": key, "source": "env", "env": k, "value": shown})
+        })
+        .collect();
+    out.sort_by(|a, b| a["env"].as_str().cmp(&b["env"].as_str()));
+    out
 }
 
 /// The kit's routes, with their state.
@@ -207,7 +265,10 @@ pub fn router<S: Clone + Send + Sync + 'static>(st: Arc<AppState>) -> Router<S> 
         }
     });
     kit_server_notices::spawn_rechecks(ks.clone());
-    let health = kit_server_health::Health::new(ks.0.version.trim_start_matches('v'), None);
+    let health = kit_server_health::Health::new(
+        ks.0.version.trim_start_matches('v'),
+        crate::web::next_build(),
+    );
     Router::new()
         .merge(kit_server_health::router(health))
         .merge(kit_server_changelog::router())
@@ -383,4 +444,23 @@ fn diagnostics() -> Registry<KitState> {
                     .fix("Check the log folder's mount and permissions"),
             }
         })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn diagnostics_hide_secrets() {
+        let vars = [
+            ("CADDYMIUM_SETUP_TOKEN", "abc"),
+            ("CADDYMIUM_LISTEN", ":8080"),
+            ("PATH", "/bin"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()));
+        let s = super::env_settings(vars);
+        assert_eq!(s.len(), 2);
+        assert_eq!(s[0]["env"], "CADDYMIUM_LISTEN");
+        assert_eq!(s[0]["value"], ":8080");
+        assert_eq!(s[1]["value"], "•••• (set)");
+    }
 }

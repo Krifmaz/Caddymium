@@ -41,3 +41,13 @@ Non-obvious calls, one line each, newest last.
   A new bug report notifies through the panel's channels (event `bug_report`).
 - 2026-11-05 · docs/releases/0.7.0.md makes the next release 0.7.0 (the reliability work plus the kit's server
   side); the notes say the kit's web app follows, so they never promise what isn't shipped.
+- 2026-11-05 · The web app moves to the kit (Leptos, `web/`, built by trunk) page by page. Until every page is
+  there it is served at `/next/` next to the classic Svelte UI at `/`, with "Try the new look" in the classic
+  sidebar; a page that hasn't moved links to its classic version. The last step makes it the default and removes
+  the Svelte UI.
+- 2026-11-05 · The kit has only a few icons, so the web app adds the Lucide icons it needs (`web/src/icons.rs`) in the
+  kit's style; they move into the kit when the kit takes app icons.
+- 2026-11-05 · Themes: the kit's four (Encore default, Dark, Black, Light) plus System, per browser. The 2FA QR code
+  comes from the server as SVG, so the web app needs no QR library.
+- 2026-11-05 · Every panel answer carries `x-caddymium: 1`, so the kit web app tells a proxy's error page (the
+  panel restarting) from the panel's own errors.

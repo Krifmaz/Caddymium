@@ -500,6 +500,9 @@ async fn common(State(st): State<Arc<AppState>>, mut req: Request, next: Next) -
     );
     h.insert("x-frame-options", HeaderValue::from_static("DENY"));
     h.insert("referrer-policy", HeaderValue::from_static("same-origin"));
+    // every answer says it is the panel's: the kit web app tells a proxy's
+    // error page (a 502 while the panel restarts) from the panel's own errors
+    h.insert("x-caddymium", HeaderValue::from_static("1"));
     resp
 }
 
@@ -757,6 +760,9 @@ pub fn router(st: Arc<AppState>) -> Router {
         .merge(crate::kit::router(st.clone()))
         .nest("/api", api)
         .merge(sso_pages)
+        .route("/next", get(crate::web::next))
+        .route("/next/", get(crate::web::next))
+        .route("/next/{*path}", get(crate::web::next))
         .fallback(crate::web::spa)
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .layer(middleware::from_fn_with_state(st.clone(), common))

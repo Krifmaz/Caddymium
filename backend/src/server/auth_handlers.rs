@@ -329,9 +329,18 @@ pub async fn totp_begin(
         .map_err(|e| ApiError::internal(e.to_string()))?;
     st.store
         .kv_set_json(&format!("totp_pending:{}", p.user.id), &enc)?;
+    let uri = auth::totp_uri("Caddymium", &p.user.username, &secret);
+    // the QR code as SVG, so a page needs no QR library
+    let qr = qrcode::QrCode::new(uri.as_bytes())
+        .map(|c| {
+            c.render::<qrcode::render::svg::Color>()
+                .min_dimensions(200, 200)
+                .build()
+        })
+        .unwrap_or_default();
     Ok(json(
         StatusCode::OK,
-        &serde_json::json!({"secret": secret, "uri": auth::totp_uri("Caddymium", &p.user.username, &secret)}),
+        &serde_json::json!({"secret": secret, "uri": uri, "qr_svg": qr}),
     ))
 }
 

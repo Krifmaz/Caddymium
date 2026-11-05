@@ -197,7 +197,8 @@ backend/src/
   scan.rs       "Find app" network scanner
   notify.rs     notification channels (webhooks, ntfy, Gotify, email, …)
   kit.rs        Krifmaz kit server crates: health, What's new, notices, bug reports, diagnostics
-frontend/       Svelte 5 UI
+frontend/       Svelte 5 UI (the classic UI, served at /)
+web/            the web app on the Krifmaz kit (Leptos, trunk), served at /next/ while pages move over
 caddy/          Caddy image (xcaddy + plugins) and entrypoint
 ```
 

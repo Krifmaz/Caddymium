@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#161617">
+  <meta name="application-name" content="Caddymium">
+  <title>Caddymium</title>
+  <link data-trunk rel="icon" href="static/favicon.svg">
+  <link data-trunk rel="copy-file" href="static/favicon.svg">
+  <!-- the kit's colour tokens and components (copied from Krifmaz/kit at the pinned tag), then the app's rules -->
+  <link data-trunk rel="css" href="static/css/tokens.css">
+  <link data-trunk rel="css" href="static/css/kit.css">
+  <link data-trunk rel="css" href="static/css/app.css">
+  <link data-trunk rel="css" href="static/css/caddymium.css">
+  <link data-trunk rel="rust" data-wasm-opt="z" data-bin="caddymium-web">
+</head>
+<body>
+  <div id="app"></div>
+  <div id="toasts"></div>
+  <div id="modal-root"></div>
+</body>
+</html>
