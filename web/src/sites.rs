@@ -388,10 +388,8 @@ pub fn payload(site: &Value) -> Value {
             }
         }
     }
-    for k in ["headers_set"] {
-        if c[k].as_object().is_some_and(Map::is_empty) {
-            c.as_object_mut().map(|o| o.remove(k));
-        }
+    if c["headers_set"].as_object().is_some_and(Map::is_empty) {
+        c.as_object_mut().map(|o| o.remove("headers_set"));
     }
     out
 }
