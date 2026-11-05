@@ -398,3 +398,20 @@ pub fn show<V: IntoView + 'static>(sig: Loaded, f: impl Fn(Value) -> V + 'static
         Some(Ok(v)) => f(v).into_any(),
     }
 }
+
+/// A coloured initial for a site, the same colour for the same name.
+#[component]
+pub fn Avatar(#[prop(into)] name: String, #[prop(optional)] size: Option<u32>) -> impl IntoView {
+    const PALETTE: [&str; 10] =
+        ["#0e9f6e", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0891b2", "#4f46e5", "#ca8a04", "#059669", "#9333ea"];
+    let size = size.unwrap_or(36);
+    let h = name.chars().fold(0u32, |h, c| h.wrapping_mul(31).wrapping_add(c as u32));
+    let color = PALETTE[(h % PALETTE.len() as u32) as usize];
+    let plain = name.trim_start_matches("https://").trim_start_matches("http://").trim_start_matches("www.");
+    let letter = plain.chars().find(|c| c.is_ascii_alphanumeric()).map(|c| c.to_ascii_uppercase()).unwrap_or('?');
+    let style = format!(
+        "width:{size}px;height:{size}px;font-size:{}px;background:linear-gradient(135deg, {color}, color-mix(in srgb, {color} 70%, #000))",
+        size * 2 / 5
+    );
+    view! { <span class="avatar site-av" style=style>{letter.to_string()}</span> }
+}
