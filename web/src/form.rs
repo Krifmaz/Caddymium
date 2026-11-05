@@ -169,6 +169,127 @@ pub fn Check(
     }
 }
 
+/// The length of the list at `path` (0 when it isn't a list).
+fn len_at(state: RwSignal<Value>, path: &str) -> usize {
+    get_path(&state.get(), path).as_array().map(Vec::len).unwrap_or(0)
+}
+
+/// Changes the list at `path` (made empty first when it isn't one).
+pub fn with_list(state: RwSignal<Value>, path: &str, f: impl FnOnce(&mut Vec<Value>)) {
+    state.update(|v| {
+        let mut l = get_path(v, path).as_array().cloned().unwrap_or_default();
+        f(&mut l);
+        set_path(v, path, Value::Array(l));
+    });
+}
+
+/// A list of strings at `path`, one input per item, with Add and remove. Rows are redrawn only when the
+/// count changes, so typing keeps the focus.
+#[component]
+pub fn ListField(
+    state: RwSignal<Value>,
+    #[prop(into)] path: String,
+    #[prop(optional, into)] label: String,
+    #[prop(optional, into)] hint: String,
+    #[prop(optional, into)] placeholder: String,
+    #[prop(optional, into)] add_label: Option<String>,
+) -> impl IntoView {
+    let p = path.clone();
+    let count = Memo::new(move |_| len_at(state, &p));
+    let add_label = add_label.unwrap_or_else(|| "Add".into());
+    let (p1, p2) = (path.clone(), path.clone());
+    let rows = move || {
+        let n = count.get();
+        (0..n)
+            .map(|at| {
+                let item = format!("{p1}.{at}");
+                let (item1, ph) = (item.clone(), placeholder.clone());
+                let pp = p1.clone();
+                view! {
+                    <div class="row" style="gap:6px">
+                        <input class="input grow" type="text" placeholder=ph autocomplete="off"
+                            prop:value=move || str_at(&state.get(), &item)
+                            on:input=move |e| { let t = event_target_value(&e); state.update(|s| set_path(s, &item1, Value::String(t))); }/>
+                        <button class="btn sm" type="button" aria-label="Remove" title="Remove"
+                            on:click=move |_| with_list(state, &pp, |l| { if at < l.len() { l.remove(at); } })
+                            inner_html=crate::icons::icon("x")></button>
+                    </div>
+                }
+            })
+            .collect_view()
+    };
+    view! {
+        <div class="field">
+            {(!label.is_empty()).then(|| view! { <span>{label}</span> })}
+            <div class="stack" style="gap:6px">{rows}</div>
+            <div><button class="btn sm" type="button" on:click=move |_| with_list(state, &p2, |l| l.push(Value::String(String::new())))
+                inner_html=format!("{}{add_label}", crate::icons::icon("plus"))></button></div>
+            {(!hint.is_empty()).then(|| view! { <small>{hint}</small> })}
+        </div>
+    }
+}
+
+/// A string map at `path` as name/value rows. The rows live in the field while it is shown and are written
+/// back as an object (rows with an empty name left out; no rows: the key is removed).
+#[component]
+pub fn KvField(
+    state: RwSignal<Value>,
+    #[prop(into)] path: String,
+    #[prop(optional, into)] label: String,
+    #[prop(optional, into)] key_placeholder: Option<String>,
+    #[prop(optional, into)] value_placeholder: Option<String>,
+    #[prop(optional, into)] add_label: Option<String>,
+) -> impl IntoView {
+    let start: Vec<(String, String)> = get_path(&state.get_untracked(), &path)
+        .as_object()
+        .map(|o| o.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect())
+        .unwrap_or_default();
+    let rows = RwSignal::new(start);
+    let write = move |path: &str| {
+        let mut o = Map::new();
+        for (k, v) in rows.get_untracked() {
+            if !k.trim().is_empty() {
+                o.insert(k.trim().to_string(), Value::String(v));
+            }
+        }
+        let path = path.to_string();
+        state.update(|s| set_path(s, &path, if o.is_empty() { Value::Null } else { Value::Object(o) }));
+    };
+    let count = Memo::new(move |_| rows.with(Vec::len));
+    let (kp, vp) = (key_placeholder.unwrap_or_else(|| "Name".into()), value_placeholder.unwrap_or_else(|| "Value".into()));
+    let add_label = add_label.unwrap_or_else(|| "Add".into());
+    let p1 = path.clone();
+    let list = move || {
+        (0..count.get())
+            .map(|at| {
+                let (pa, pb, pc) = (p1.clone(), p1.clone(), p1.clone());
+                let (kp, vp) = (kp.clone(), vp.clone());
+                view! {
+                    <div class="row" style="gap:6px">
+                        <input class="input" style="max-width:40%" type="text" placeholder=kp
+                            prop:value=move || rows.with(|r| r.get(at).map(|x| x.0.clone()).unwrap_or_default())
+                            on:input=move |e| { let t = event_target_value(&e); rows.update_untracked(|r| if let Some(x) = r.get_mut(at) { x.0 = t }); write(&pa); }/>
+                        <input class="input grow" type="text" placeholder=vp
+                            prop:value=move || rows.with(|r| r.get(at).map(|x| x.1.clone()).unwrap_or_default())
+                            on:input=move |e| { let t = event_target_value(&e); rows.update_untracked(|r| if let Some(x) = r.get_mut(at) { x.1 = t }); write(&pb); }/>
+                        <button class="btn sm" type="button" aria-label="Remove" title="Remove"
+                            on:click=move |_| { rows.update(|r| { if at < r.len() { r.remove(at); } }); write(&pc); }
+                            inner_html=crate::icons::icon("x")></button>
+                    </div>
+                }
+            })
+            .collect_view()
+    };
+    view! {
+        <div class="field">
+            {(!label.is_empty()).then(|| view! { <span>{label}</span> })}
+            <div class="stack" style="gap:6px">{list}</div>
+            <div><button class="btn sm" type="button" on:click=move |_| rows.update(|r| r.push((String::new(), String::new())))
+                inner_html=format!("{}{add_label}", crate::icons::icon("plus"))></button></div>
+        </div>
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

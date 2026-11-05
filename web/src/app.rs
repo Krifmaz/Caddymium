@@ -84,9 +84,13 @@ pub fn b(v: &Value, k: &str) -> bool {
     v.get(k).and_then(Value::as_bool).unwrap_or(false)
 }
 
-/// A number field, 0 when missing.
+/// A number field (or a number written as text, as selects and fields keep it), 0 when missing.
 pub fn i(v: &Value, k: &str) -> i64 {
-    v.get(k).and_then(Value::as_i64).unwrap_or(0)
+    match v.get(k) {
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(Value::String(t)) => t.trim().parse().unwrap_or(0),
+        _ => 0,
+    }
 }
 
 /// An array field, empty when missing.

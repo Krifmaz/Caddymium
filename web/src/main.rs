@@ -14,6 +14,7 @@ mod app;
 mod form;
 mod icons;
 mod pages;
+mod sites;
 mod ui;
 
 use app::{me, navigate, Route};
